@@ -4,8 +4,10 @@
 import {
   UPGRADES, UPGRADE_BRANCHES, RARITIES, RARITY_ORDER, DRONE_BY_ID,
   DRONES_BY_RARITY, PLANETS, ROULETTE, formatShort,
+  ACHIEVEMENTS, DAILY_REWARDS, FUSION, BOOST, GEM_SHOP,
 } from './config.js';
 import { drawDroneIcon, drawPlanetIcon } from './sprites.js';
+import { audio } from './audio.js';
 
 const $ = (s) => document.querySelector(s);
 const money = (n) => '₡' + formatShort(n);
@@ -27,26 +29,61 @@ export class UI {
     this.particles = particles;
     this.sdk = sdk;
     this.spinning = false;
+    this._achQueue = [];
+    this._lastOffline = null;
     this._bind();
+    this._applySettings();
     this.refreshAll();
   }
 
   _bind() {
     // Rail buttons
-    $('#btnRoulette').onclick = () => this.openRoulette();
-    $('#btnUpgrades').onclick = () => this.openUpgrades();
-    $('#btnPlanet').onclick = () => this.openPlanet();
+    $('#btnRoulette').onclick = () => { audio.click(); this.openRoulette(); };
+    $('#btnUpgrades').onclick = () => { audio.click(); this.openUpgrades(); };
+    $('#btnFuse').onclick = () => { audio.click(); this.openFuse(); };
+    $('#btnPlanet').onclick = () => { audio.click(); this.openPlanet(); };
     $('#sellBtn').onclick = () => this.doSell();
     $('#doSpin').onclick = () => this.doSpin();
     $('#doPlanet').onclick = () => this.doPlanetUpgrade();
 
+    // Icon cluster
+    $('#btnDaily').onclick = () => { audio.click(); this.openDaily(); };
+    $('#btnAch').onclick = () => { audio.click(); this.openAchievements(); };
+    $('#btnBoost').onclick = () => { audio.click(); this.openBoost(); };
+    $('#btnSound').onclick = () => this.toggleSound();
+    $('#claimDaily').onclick = () => this.doClaimDaily();
+    $('#offlineDouble').onclick = () => this.doOfflineDouble();
+
     // Close buttons / overlay click-out
     document.querySelectorAll('[data-close]').forEach(b => {
-      b.onclick = (e) => { e.target.closest('.overlay').classList.remove('open'); };
+      b.onclick = (e) => { audio.click(); e.target.closest('.overlay').classList.remove('open'); };
     });
     document.querySelectorAll('.overlay').forEach(ov => {
       ov.addEventListener('click', (e) => { if (e.target === ov) ov.classList.remove('open'); });
     });
+  }
+
+  _applySettings() {
+    const s = this.game.state.settings || (this.game.state.settings = { sound: true, music: true });
+    audio.setSound(s.sound !== false);
+    audio.musicOn = s.music !== false;
+    this._updateSoundIcon();
+  }
+
+  _updateSoundIcon() {
+    const on = this.game.state.settings?.sound !== false;
+    $('#soundIcon').textContent = on ? '🔊' : '🔇';
+  }
+
+  toggleSound() {
+    const s = this.game.state.settings;
+    s.sound = !(s.sound !== false);        // toggle
+    s.music = s.sound;                      // music follows sound master
+    audio.setSound(s.sound);
+    audio.setMusic(s.music);
+    if (s.sound) audio.resume();
+    this._updateSoundIcon();
+    audio.click();
   }
 
   // ---- Master refresh ------------------------------------------------------
@@ -56,6 +93,8 @@ export class UI {
     this.updatePlanetName();
     this.updateInventory();
     this.updateRailCosts();
+    this.updateBadges();
+    this.updateBoostTimer();
   }
 
   updateMoney() {
@@ -63,6 +102,29 @@ export class UI {
     $('#gemsVal').textContent = formatShort(this.game.state.gems);
     this.updateRailCosts();
     this._refreshOpenModals();
+  }
+
+  updateBadges() {
+    // Daily claimable dot
+    const daily = this.game.dailyStatus();
+    $('#dailyBadge').classList.toggle('show', daily.canClaim);
+    $('#dailyBadge').textContent = daily.canClaim ? '!' : '';
+    $('#btnDaily').classList.toggle('pulse', daily.canClaim);
+    // Achievements progress badge (unclaimed = none; just show remaining count subtly off)
+    const prog = this.game.achievementProgress();
+    const left = prog.total - prog.done;
+    // No badge for achievements count by default; keep clean.
+  }
+
+  updateBoostTimer() {
+    const el = $('#boostTimer');
+    if (this.game.boostActive()) {
+      el.classList.add('show');
+      const s = this.game.boostRemaining();
+      $('#boostTime').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    } else {
+      el.classList.remove('show');
+    }
   }
 
   updateRailCosts() {
@@ -125,9 +187,13 @@ export class UI {
   doSell() {
     const val = this.game.sellAll();
     if (val > 0) {
+      audio.sell();
       this.toast(`Продано на ${money(val)}`);
       this.updateMoney();
       this.updateCargo();
+      this.game.evaluateAchievements();
+    } else {
+      audio.error();
     }
   }
 
@@ -207,6 +273,7 @@ export class UI {
     reel.getBoundingClientRect();           // force reflow
     reel.style.transition = 'transform 3.4s cubic-bezier(.12,.7,.15,1)';
     reel.style.transform = `translateX(${finalX + (Math.random() * 30 - 15)}px)`;
+    audio.spinTicks(3400);
 
     setTimeout(() => {
       this.spinning = false;
@@ -222,9 +289,11 @@ export class UI {
       this.updateRailCosts();
       // celebrate rare pulls
       const best = results.reduce((a, b) => RARITIES[b.rarity].order > RARITIES[a.rarity].order ? b : a);
+      audio.win(RARITIES[best.rarity].order);
       if (RARITIES[best.rarity].order >= 3) {
         this.toast(`${RARITIES[best.rarity].name}: ${best.name}!`);
       }
+      this.game.evaluateAchievements();
     }, 3500);
   }
 
@@ -296,10 +365,14 @@ export class UI {
     if (!maxed) {
       btn.onclick = () => {
         if (g.buyUpgrade(key)) {
+          audio.upgrade();
           this.toast(`${def.name} → ${def.format(g.state.upgrades[key])}`);
           this.updateMoney();
           this.updateCargo();
           this.renderUpgrades();
+          this.game.evaluateAchievements();
+        } else {
+          audio.error();
         }
       };
     }
@@ -347,16 +420,18 @@ export class UI {
 
   doPlanetUpgrade() {
     if (this.game.upgradePlanet()) {
+      audio.planet();
       this.toast(`Планета улучшена: ${this.game.planet.name}!`);
       this.updateMoney();
       this.updatePlanetName();
       this.updateCargo();
       this.renderPlanet();
       this.onPlanetChange?.(this.game.state.planetTier);
+      this.game.evaluateAchievements();
+    } else {
+      audio.error();
     }
   }
-
-  doPlanetUpgradeMax() {}
 
   // ---- Place / manage drone from inventory ---------------------------------
   openPlaceFromInventory(item) {
@@ -471,13 +546,243 @@ export class UI {
     $('#placeModal').classList.add('open');
   }
 
+  // ---- Fusion --------------------------------------------------------------
+  openFuse() { this.renderFuse(); $('#fuseModal').classList.add('open'); }
+
+  renderFuse() {
+    const list = $('#fuseList');
+    list.innerHTML = '';
+    const counts = this.game.fusionCounts();
+    let any = false;
+    for (const rid of RARITY_ORDER) {
+      const c = counts[rid];
+      if (c <= 0) continue;
+      any = true;
+      const rar = RARITIES[rid];
+      const isMythic = rar.order >= RARITY_ORDER.length - 1;
+      const nextName = isMythic ? `${FUSION.mythicGemReward} ◆` : RARITIES[RARITY_ORDER[rar.order + 1]].name;
+      const can = c >= FUSION.need;
+      const row = document.createElement('div');
+      row.className = 'fuse-row';
+      row.style.setProperty('--rar', rar.color);
+      row.innerHTML = `
+        <div class="fr-info">
+          <div class="fr-rar">${rar.name}</div>
+          <div class="fr-count">В ангаре: ${c} · нужно ${FUSION.need}</div>
+        </div>
+        <div class="fr-arrow">${FUSION.need}× → ${nextName}</div>
+        <button class="fuse-btn-do" ${can ? '' : 'disabled'}>Сплавить</button>`;
+      row.querySelector('.fuse-btn-do').onclick = () => this.doFuse(rid);
+      list.appendChild(row);
+    }
+    if (!any) {
+      const e = document.createElement('div');
+      e.className = 'fuse-empty';
+      e.textContent = 'В ангаре нет свободных дронов. Снимай дублей с планеты или крути рулетку, чтобы копить дронов для слияния.';
+      list.appendChild(e);
+    }
+  }
+
+  doFuse(rarity) {
+    const res = this.game.fuse(rarity);
+    if (!res) { audio.error(); return; }
+    audio.fuse();
+    if (res.result) {
+      const d = res.result;
+      this.game.autoPlace(d.id);
+      this.toast(`Слияние: ${RARITIES[d.rarity].name} ${d.name}!`);
+    } else if (res.gems) {
+      this.toast(`Переработка: +${res.gems} ◆`);
+    }
+    this.updateMoney();
+    this.updateInventory();
+    this.renderFuse();
+    this.game.evaluateAchievements();
+  }
+
+  // ---- Achievements --------------------------------------------------------
+  openAchievements() { this.renderAchievements(); $('#achModal').classList.add('open'); }
+
+  renderAchievements() {
+    const prog = this.game.achievementProgress();
+    $('#achCount').textContent = `${prog.done}/${prog.total}`;
+    const list = $('#achList');
+    list.innerHTML = '';
+    for (const a of ACHIEVEMENTS) {
+      const done = !!this.game.state.achievements[a.id];
+      const item = document.createElement('div');
+      item.className = 'ach-item' + (done ? ' done' : '');
+      const reward = a.reward?.gems ? `+${a.reward.gems} ◆` : a.reward?.money ? `+${money(a.reward.money)}` : '';
+      item.innerHTML = `
+        <div class="ai-icon">${a.icon}</div>
+        <div class="ai-main">
+          <div class="ai-name">${a.name}</div>
+          <div class="ai-desc">${a.desc}</div>
+          <div class="ai-reward">${done ? '✓ Получено' : reward}</div>
+        </div>`;
+      list.appendChild(item);
+    }
+  }
+
+  // Called from main when an achievement unlocks.
+  onAchievement(a) {
+    audio.achievement();
+    const reward = a.reward?.gems ? `+${a.reward.gems} ◆` : a.reward?.money ? `+${money(a.reward.money)}` : '';
+    this.toast(`🏆 ${a.name} · ${reward}`);
+    this.updateMoney();
+  }
+
+  // ---- Daily ---------------------------------------------------------------
+  openDaily() { this.renderDaily(); $('#dailyModal').classList.add('open'); }
+
+  renderDaily() {
+    const st = this.game.dailyStatus();
+    const grid = $('#dailyGrid');
+    grid.innerHTML = '';
+    DAILY_REWARDS.forEach((r, i) => {
+      const tile = document.createElement('div');
+      let cls = 'daily-tile';
+      if (i < st.dayIndex) cls += ' claimed';
+      else if (i === st.dayIndex && st.canClaim) cls += ' today';
+      else if (i > st.dayIndex) cls += ' locked';
+      else if (i === st.dayIndex && !st.canClaim) cls += ' claimed';
+      tile.className = cls;
+      const amt = r.gems ? `${r.gems} ◆` : money(r.money);
+      const checked = i < st.dayIndex || (i === st.dayIndex && !st.canClaim);
+      tile.innerHTML = `
+        ${checked ? '<div class="dt-check">✓</div>' : ''}
+        <div class="dt-day">День ${r.day}</div>
+        <div class="dt-icon">${r.icon}</div>
+        <div class="dt-amt">${amt}</div>`;
+      grid.appendChild(tile);
+    });
+    const btn = $('#claimDaily');
+    btn.disabled = !st.canClaim;
+    btn.textContent = st.canClaim ? 'Забрать награду' : 'Уже забрано — приходи завтра';
+  }
+
+  doClaimDaily() {
+    const res = this.game.claimDaily();
+    if (!res) { audio.error(); return; }
+    audio.daily();
+    const r = res.reward;
+    const amt = r.gems ? `+${r.gems} ◆` : `+${money(r.money)}`;
+    this.toast(`День ${res.day}: ${amt}${r.boost ? ' + Буст!' : ''}`);
+    this.updateMoney();
+    this.updateBadges();
+    this.updateBoostTimer();
+    this.renderDaily();
+    this.game.evaluateAchievements();
+  }
+
+  // ---- Boost / gem shop ----------------------------------------------------
+  openBoost() { this.renderBoost(); $('#boostModal').classList.add('open'); }
+
+  renderBoost() {
+    const list = $('#boostList');
+    list.innerHTML = '';
+    const gems = this.game.state.gems;
+    const active = this.game.boostActive();
+    const mins = Math.floor(BOOST.duration / 60);
+
+    // 1) x2 income via rewarded ad
+    const c1 = document.createElement('div');
+    c1.className = 'boost-card';
+    c1.innerHTML = `
+      <div class="bc-icon">⚡</div>
+      <div class="bc-main">
+        <div class="bc-name">Ускоритель ✕2</div>
+        <div class="bc-desc">Удваивает весь доход на ${mins} мин${active ? ' · <b style="color:#ffd54a">активен</b>' : ''}</div>
+      </div>
+      <button class="btn-ad" id="boostAd">Смотреть</button>`;
+    c1.querySelector('#boostAd').onclick = () => this.watchBoostAd();
+    list.appendChild(c1);
+
+    // 2) x2 income via gems
+    const c2 = document.createElement('div');
+    c2.className = 'boost-card';
+    c2.innerHTML = `
+      <div class="bc-icon">⚡</div>
+      <div class="bc-main">
+        <div class="bc-name">Ускоритель ✕2 за гемы</div>
+        <div class="bc-desc">${mins} мин двойного дохода без рекламы</div>
+      </div>
+      <button class="btn-gem" id="boostGem" ${gems < BOOST.gemCost ? 'disabled' : ''}>${BOOST.gemCost} ◆</button>`;
+    c2.querySelector('#boostGem').onclick = () => {
+      if (this.game.state.gems < BOOST.gemCost) { audio.error(); return; }
+      this.game.state.gems -= BOOST.gemCost;
+      this.game.activateBoost(BOOST.duration);
+      audio.boost();
+      this.updateMoney(); this.updateBoostTimer(); this.renderBoost();
+      this.toast('Ускоритель ✕2 активен!');
+    };
+    list.appendChild(c2);
+
+    // 3) Lucky spin (guaranteed Epic+) via gems
+    const c3 = document.createElement('div');
+    c3.className = 'boost-card';
+    c3.innerHTML = `
+      <div class="bc-icon">🍀</div>
+      <div class="bc-main">
+        <div class="bc-name">Удачный спин</div>
+        <div class="bc-desc">Гарантированный дрон Эпик или выше</div>
+      </div>
+      <button class="btn-gem" id="luckyGem" ${gems < GEM_SHOP.luckySpinCost ? 'disabled' : ''}>${GEM_SHOP.luckySpinCost} ◆</button>`;
+    c3.querySelector('#luckyGem').onclick = () => this.doLuckySpin();
+    list.appendChild(c3);
+  }
+
+  watchBoostAd() {
+    const grant = () => {
+      this.game.activateBoost(BOOST.duration);
+      audio.boost();
+      this.updateBoostTimer(); this.renderBoost();
+      this.toast('Ускоритель ✕2 активен!');
+    };
+    if (this.sdk?.showRewarded) {
+      this.sdk.showRewarded({ onReward: grant, onClose: () => {} });
+    } else {
+      grant();
+    }
+  }
+
+  doLuckySpin() {
+    const d = this.game.luckySpin();
+    if (!d) { audio.error(); return; }
+    audio.win(RARITIES[d.rarity].order);
+    this.game.autoPlace(d.id);
+    this.updateMoney(); this.updateInventory(); this.renderBoost();
+    this.toast(`Удачный спин: ${RARITIES[d.rarity].name} ${d.name}!`);
+    this.game.evaluateAchievements();
+  }
+
   // ---- Offline ----
   showOffline(result) {
+    this._lastOffline = result;
     const mins = Math.floor(result.seconds / 60);
     const h = Math.floor(mins / 60), m = mins % 60;
     const timeStr = h > 0 ? `${h}ч ${m}м` : `${m}м`;
     $('#offlineText').innerHTML = `Пока вас не было (${timeStr}), дроны намайнили:<br><span class="earn">+${money(result.earned)}</span>`;
+    $('#offlineDouble').style.display = '';
     $('#offlineModal').classList.add('open');
+  }
+
+  doOfflineDouble() {
+    const res = this._lastOffline;
+    if (!res) return;
+    const grant = () => {
+      this.game.addMoney(res.earned);   // add the same amount again = x2 total
+      audio.sell();
+      this.toast(`Удвоено: +${money(res.earned)}`);
+      this.updateMoney();
+      $('#offlineModal').classList.remove('open');
+    };
+    this._lastOffline = null;
+    if (this.sdk?.showRewarded) {
+      this.sdk.showRewarded({ onReward: grant, onClose: () => {} });
+    } else {
+      grant();
+    }
   }
 
   // ---- Toast ----
@@ -491,6 +796,7 @@ export class UI {
   _refreshOpenModals() {
     if ($('#upgradesModal').classList.contains('open')) this.renderUpgrades();
     if ($('#planetModal').classList.contains('open')) this.renderPlanet();
+    if ($('#boostModal').classList.contains('open')) this.renderBoost();
     if ($('#rouletteModal').classList.contains('open') && !this.spinning) {
       $('#doSpin').disabled = !this.game.canSpin();
       $('#doSpinCost').textContent = money(this.game.spinCost());

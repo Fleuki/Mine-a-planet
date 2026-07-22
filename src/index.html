@@ -63,11 +63,36 @@
         <span class="rb-icon">⚙️</span>
         <span class="rb-label">Апгрейды</span>
       </button>
+      <button class="rail-btn fuse-btn" id="btnFuse">
+        <span class="rb-icon">⚗️</span>
+        <span class="rb-label">Слияние</span>
+      </button>
       <button class="rail-btn planet-btn" id="btnPlanet">
         <span class="rb-icon">🪐</span>
         <span class="rb-label">Планета</span>
         <span class="rb-cost" id="planetCost">₡1K</span>
       </button>
+    </div>
+
+    <!-- Right icon cluster -->
+    <div class="icon-rail" id="iconRail">
+      <button class="icon-btn" id="btnDaily" title="Ежедневная награда">
+        <span>📅</span><span class="badge" id="dailyBadge"></span>
+      </button>
+      <button class="icon-btn" id="btnAch" title="Достижения">
+        <span>🏆</span><span class="badge" id="achBadge"></span>
+      </button>
+      <button class="icon-btn" id="btnBoost" title="Ускорители">
+        <span>⚡</span>
+      </button>
+      <button class="icon-btn" id="btnSound" title="Звук">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+
+    <!-- Active boost timer -->
+    <div class="boost-timer" id="boostTimer">
+      <span>⚡ x2</span><span id="boostTime">5:00</span>
     </div>
 
     <!-- Bottom: drone inventory hotbar -->
@@ -125,12 +150,51 @@
     </div>
   </div>
 
+  <!-- ===== Fusion modal ===== -->
+  <div class="overlay" id="fuseModal">
+    <div class="modal fuse-modal">
+      <button class="close" data-close></button>
+      <h2>Машина слияния</h2>
+      <p class="fuse-hint">Сплавь <b>3</b> дрона одной редкости → получи <b>1</b> дрона выше рангом. Работает с дронами из ангара.</p>
+      <div class="fuse-list" id="fuseList"></div>
+    </div>
+  </div>
+
+  <!-- ===== Achievements modal ===== -->
+  <div class="overlay" id="achModal">
+    <div class="modal ach-modal">
+      <button class="close" data-close></button>
+      <h2>Достижения <span class="ach-count" id="achCount"></span></h2>
+      <div class="ach-list" id="achList"></div>
+    </div>
+  </div>
+
+  <!-- ===== Daily rewards modal ===== -->
+  <div class="overlay" id="dailyModal">
+    <div class="modal daily-modal">
+      <button class="close" data-close></button>
+      <h2>Ежедневная награда</h2>
+      <div class="daily-grid" id="dailyGrid"></div>
+      <button class="big-btn" id="claimDaily">Забрать</button>
+    </div>
+  </div>
+
+  <!-- ===== Boost / gem shop modal ===== -->
+  <div class="overlay" id="boostModal">
+    <div class="modal boost-modal">
+      <button class="close" data-close></button>
+      <h2>Ускорители</h2>
+      <div class="boost-list" id="boostList"></div>
+    </div>
+  </div>
+
   <!-- ===== Offline earnings toast ===== -->
   <div class="overlay" id="offlineModal">
     <div class="modal offline-modal">
       <h2>С возвращением!</h2>
       <p id="offlineText"></p>
-      <button class="big-btn" data-close>Забрать</button>
+      <button class="big-btn ad-btn" id="offlineDouble"><span class="ad-tag">Реклама</span> Удвоить награду ✕2</button>
+      <button class="big-btn ghost" data-close>Забрать</button>
     </div>
   </div>
 

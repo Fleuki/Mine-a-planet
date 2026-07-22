@@ -7,6 +7,7 @@ import { Background } from './background.js';
 import { WorldRenderer } from './render.js';
 import { Particles } from './particles.js';
 import { UI } from './ui.js';
+import { audio } from './audio.js';
 import { DRONE_BY_ID, RARITIES, formatShort } from './config.js';
 
 const canvas = document.getElementById('game');
@@ -42,6 +43,7 @@ on('mined', ({ slot, ore, amount }) => {
   const sy = world.cy - Math.sin(toCenter) * world.R * 0.95;
   particles.burst(sx, sy, ore.color, 5, { speed: 70, life: 0.5, size: 2.5, gravity: 90 });
   particles.burst(sx, sy, ore.shine, 3, { speed: 40, life: 0.4, size: 2 });
+  audio.mine();
 });
 
 on('sold', ({ value }) => {
@@ -92,6 +94,7 @@ canvas.addEventListener('pointerleave', () => { pointer.x = -999; pointer.y = -9
 // --- Main loop --------------------------------------------------------------
 let last = performance.now();
 let saveTimer = 0;
+let uiTimer = 0;
 function loop(now) {
   let dt = (now - last) / 1000;
   last = now;
@@ -129,6 +132,13 @@ function loop(now) {
 
   particles.draw(ctx);
 
+  // periodic UI heartbeat (boost timer, badges, achievements)
+  uiTimer += dt;
+  if (uiTimer > 1) {
+    uiTimer = 0;
+    if (ui) { ui.updateBoostTimer(); ui.updateBadges(); game.evaluateAchievements(); }
+  }
+
   // periodic autosave
   saveTimer += dt;
   if (saveTimer > 12) { saveTimer = 0; save(); }
@@ -156,7 +166,7 @@ async function boot() {
   game = new Game(state);
   // Debug hook (harmless in production; handy for tuning).
   window.__game = game;
-  window.__cheat = () => { game.state.money += 1e7; ui && ui.updateMoney(); };
+  window.__cheat = () => { game.state.money += 1e7; game.state.gems += 500; ui && ui.updateMoney(); };
 
   resize();
   world.setTier(game.state.planetTier);
@@ -165,7 +175,17 @@ async function boot() {
 
   // hook money/upgrade/planet events to refresh HUD
   on('money', () => ui.updateMoney());
+  on('gems', () => ui.updateMoney());
+  on('boost', () => ui.updateBoostTimer());
+  on('achievement', (a) => ui.onAchievement(a));
   on('slots', () => { /* handled inline */ });
+
+  // Resume audio on first user gesture (browser autoplay policy).
+  const kick = () => { audio.resume(); window.removeEventListener('pointerdown', kick); };
+  window.addEventListener('pointerdown', kick);
+
+  // Evaluate achievements shortly after load (offline progress may unlock some).
+  setTimeout(() => game.evaluateAchievements(), 500);
 
   // offline earnings
   const off = game.applyOffline();
@@ -189,6 +209,10 @@ function migrate(saved) {
   const merged = { ...def, ...saved };
   merged.upgrades = { ...def.upgrades, ...(saved.upgrades || {}) };
   merged.stats = { ...def.stats, ...(saved.stats || {}) };
+  merged.achievements = { ...(saved.achievements || {}) };
+  merged.daily = { ...def.daily, ...(saved.daily || {}) };
+  merged.boost = { ...def.boost, ...(saved.boost || {}) };
+  merged.settings = { ...def.settings, ...(saved.settings || {}) };
   if (!Array.isArray(merged.slots) || merged.slots.length === 0) merged.slots = def.slots;
   if (!Array.isArray(merged.inventory)) merged.inventory = [];
   return merged;

@@ -4,6 +4,7 @@
 import {
   ORES, DRONES, DRONE_BY_ID, DRONES_BY_RARITY, RARITIES, RARITY_ORDER,
   PLANETS, UPGRADES, ROULETTE, planetUpgradeCost,
+  BOOST, ACHIEVEMENTS, DAILY_REWARDS, FUSION, GEM_SHOP,
 } from './config.js';
 
 let _uid = 1;
@@ -22,7 +23,11 @@ export function createDefaultState() {
     upgrades: Object.fromEntries(Object.keys(UPGRADES).map(k => [k, 0])),
     autosellUnlocked: false,
     spins: 0,
-    stats: { totalEarned: 0, totalSpins: 0, bestRarity: 'common', dronesPlaced: 0 },
+    stats: { totalEarned: 0, totalSpins: 0, bestRarity: 'common', dronesPlaced: 0, totalFused: 0 },
+    achievements: {},                 // id -> true
+    daily: { lastClaimDay: null, streak: 0 },
+    boost: { until: 0 },              // ms timestamp
+    settings: { sound: true, music: true },
     lastSeen: Date.now(),
     createdAt: Date.now(),
   };
@@ -93,7 +98,18 @@ export class Game {
   }
 
   oreSellValue(ore) {
-    return ore.value * this.oreValueMult * this.planetValueMult;
+    return ore.value * this.oreValueMult * this.planetValueMult * this.incomeMult();
+  }
+
+  // --- Boost ----------------------------------------------------------------
+  boostActive() { return Date.now() < (this.state.boost?.until || 0); }
+  boostRemaining() { return Math.max(0, Math.floor(((this.state.boost?.until || 0) - Date.now()) / 1000)); }
+  incomeMult() { return this.boostActive() ? BOOST.mult : 1; }
+  activateBoost(seconds = BOOST.duration) {
+    const now = Date.now();
+    const base = Math.max(now, this.state.boost?.until || 0);
+    this.state.boost.until = base + seconds * 1000;
+    emit('boost');
   }
 
   // --- Simulation tick ------------------------------------------------------
@@ -201,6 +217,26 @@ export class Game {
     this.state.inventory.push({ uid: uid(), droneId });
   }
 
+  // Guaranteed Epic-or-better drone, paid with gems.
+  luckySpin() {
+    if (this.state.gems < GEM_SHOP.luckySpinCost) return null;
+    this.state.gems -= GEM_SHOP.luckySpinCost;
+    emit('gems', this.state.gems);
+    this.state.stats.totalSpins++;
+    // weight epic/legendary/mythic
+    const tiers = ['epic', 'legendary', 'mythic'];
+    const weights = [70, 25, 5];
+    let total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total, chosen = 'epic';
+    for (let i = 0; i < tiers.length; i++) { r -= weights[i]; if (r <= 0) { chosen = tiers[i]; break; } }
+    const pool = DRONES_BY_RARITY[chosen];
+    const drone = pool[Math.floor(Math.random() * pool.length)];
+    if (RARITIES[drone.rarity].order > RARITIES[this.state.stats.bestRarity].order) {
+      this.state.stats.bestRarity = drone.rarity;
+    }
+    return drone;
+  }
+
   // --- Slot management ------------------------------------------------------
   placeDrone(invUid, slotIndex) {
     const invIdx = this.state.inventory.findIndex(d => d.uid === invUid);
@@ -300,6 +336,126 @@ export class Game {
     emit('money', this.state.money);
     emit('planet', this.state.planetTier);
     return true;
+  }
+
+  // --- Gems -----------------------------------------------------------------
+  addGems(n) { this.state.gems += n; emit('gems', this.state.gems); }
+  addMoney(n) { this.state.money += n; emit('money', this.state.money); }
+
+  // --- Fusion (Fuse Machine) ------------------------------------------------
+  // How many drones of each rarity are available to fuse (inventory only).
+  fusionCounts() {
+    const counts = {};
+    for (const r of RARITY_ORDER) counts[r] = 0;
+    for (const it of this.state.inventory) {
+      const d = DRONE_BY_ID[it.droneId];
+      if (d) counts[d.rarity]++;
+    }
+    return counts;
+  }
+
+  canFuse(rarity) {
+    return this.fusionCounts()[rarity] >= FUSION.need;
+  }
+
+  // Fuse `need` drones of a rarity. Returns { result, gems } or null.
+  fuse(rarity) {
+    if (!this.canFuse(rarity)) return null;
+    // consume the first `need` matching drones from inventory
+    let removed = 0;
+    for (let i = this.state.inventory.length - 1; i >= 0 && removed < FUSION.need; i--) {
+      const d = DRONE_BY_ID[this.state.inventory[i].droneId];
+      if (d && d.rarity === rarity) { this.state.inventory.splice(i, 1); removed++; }
+    }
+    this.state.stats.totalFused = (this.state.stats.totalFused || 0) + 1;
+
+    const order = RARITIES[rarity].order;
+    if (order >= RARITY_ORDER.length - 1) {
+      // Mythic recycle -> gems
+      this.addGems(FUSION.mythicGemReward);
+      emit('fuse', { gems: FUSION.mythicGemReward });
+      return { gems: FUSION.mythicGemReward };
+    }
+    const nextRarity = RARITY_ORDER[order + 1];
+    const pool = DRONES_BY_RARITY[nextRarity];
+    const result = pool[Math.floor(Math.random() * pool.length)];
+    if (RARITIES[result.rarity].order > RARITIES[this.state.stats.bestRarity].order) {
+      this.state.stats.bestRarity = result.rarity;
+    }
+    emit('fuse', { result });
+    return { result };
+  }
+
+  // --- Achievements ---------------------------------------------------------
+  // Evaluate all locked achievements; unlock newly-satisfied ones. Returns list.
+  evaluateAchievements() {
+    const newly = [];
+    for (const a of ACHIEVEMENTS) {
+      if (this.state.achievements[a.id]) continue;
+      let ok = false;
+      try { ok = a.check(this); } catch (e) { ok = false; }
+      if (ok) {
+        this.state.achievements[a.id] = true;
+        if (a.reward?.money) this.state.money += a.reward.money;
+        if (a.reward?.gems) this.state.gems += a.reward.gems;
+        newly.push(a);
+      }
+    }
+    if (newly.length) {
+      emit('money', this.state.money);
+      emit('gems', this.state.gems);
+      for (const a of newly) emit('achievement', a);
+    }
+    return newly;
+  }
+
+  achievementProgress() {
+    const total = ACHIEVEMENTS.length;
+    const done = ACHIEVEMENTS.filter(a => this.state.achievements[a.id]).length;
+    return { done, total };
+  }
+
+  // --- Daily rewards --------------------------------------------------------
+  _todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  }
+  _dayNumber(date = new Date()) {
+    return Math.floor(new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 86400000);
+  }
+
+  dailyStatus() {
+    const daily = this.state.daily || (this.state.daily = { lastClaimDay: null, streak: 0 });
+    const today = this._todayKey();
+    const canClaim = daily.lastClaimDay !== today;
+    // What day index (1..7) would this claim be?
+    let streak = daily.streak || 0;
+    if (canClaim) {
+      // continued streak only if last claim was yesterday
+      const todayNum = this._dayNumber();
+      const lastNum = daily.lastClaimDayNum ?? null;
+      if (lastNum === todayNum - 1) streak = streak; // continue
+      else streak = 0;                               // reset
+    }
+    const dayIndex = (streak % DAILY_REWARDS.length);
+    return { canClaim, dayIndex, streak, rewards: DAILY_REWARDS };
+  }
+
+  claimDaily() {
+    const st = this.dailyStatus();
+    if (!st.canClaim) return null;
+    const reward = DAILY_REWARDS[st.dayIndex];
+    if (reward.money) this.state.money += reward.money;
+    if (reward.gems) this.state.gems += reward.gems;
+    if (reward.boost) this.activateBoost(BOOST.duration);
+    const daily = this.state.daily;
+    daily.streak = (st.streak || 0) + 1;
+    daily.lastClaimDay = this._todayKey();
+    daily.lastClaimDayNum = this._dayNumber();
+    emit('money', this.state.money);
+    emit('gems', this.state.gems);
+    emit('daily');
+    return { reward, day: st.dayIndex + 1 };
   }
 
   // --- Offline earnings -----------------------------------------------------

@@ -41,7 +41,7 @@ html, body {
 
 .topbar {
   position: absolute; top: calc(12px + var(--safe-t)); left: calc(14px + var(--safe-l));
-  display: flex; gap: 10px; flex-direction: column; align-items: flex-start;
+  display: flex; gap: 10px; flex-direction: row; align-items: center;
 }
 .stat {
   display: flex; align-items: center; gap: 8px;
@@ -90,8 +90,8 @@ html, body {
 
 /* ===== Left rail ===== */
 .rail {
-  position: absolute; left: calc(14px + var(--safe-l)); top: 50%; transform: translateY(-50%);
-  display: flex; flex-direction: column; gap: 12px;
+  position: absolute; left: calc(14px + var(--safe-l)); top: calc(66px + var(--safe-t));
+  display: flex; flex-direction: column; gap: 11px;
 }
 .rail-btn {
   position: relative; width: 92px; border: 1px solid var(--panel-border); cursor: pointer;
@@ -280,6 +280,112 @@ html, body {
 .loader-fill { height: 100%; width: 30%; background: linear-gradient(90deg, var(--blue), var(--purple)); border-radius: 999px; animation: loadAnim 1.2s ease-in-out infinite; }
 @keyframes loadAnim { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
 
+.rail-btn.fuse-btn { border-color: rgba(200,140,255,.45); }
+
+/* ===== Right icon cluster ===== */
+.icon-rail {
+  position: absolute; right: calc(14px + var(--safe-r)); top: calc(150px + var(--safe-t));
+  display: flex; flex-direction: column; gap: 10px;
+}
+.icon-btn {
+  position: relative; width: 52px; height: 52px; border-radius: 15px; cursor: pointer;
+  border: 1px solid var(--panel-border); background: var(--panel); backdrop-filter: blur(14px);
+  font-size: 24px; display: grid; place-items: center; box-shadow: var(--shadow);
+  transition: transform .1s;
+}
+.icon-btn:active { transform: scale(.9); }
+.icon-btn .badge {
+  position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 800;
+  display: none; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.4);
+}
+.icon-btn .badge.show { display: flex; }
+.icon-btn.pulse { animation: pulseGlow 1.6s ease-in-out infinite; }
+
+/* ===== Boost timer ===== */
+.boost-timer {
+  position: absolute; left: 50%; transform: translateX(-50%); top: calc(64px + var(--safe-t)); display: none;
+  align-items: center; gap: 6px; padding: 5px 14px; border-radius: 999px;
+  background: linear-gradient(180deg, #ffb648, #ff7a3c); color: #3a1e00; font-weight: 800; font-size: 13px;
+  box-shadow: 0 0 16px rgba(255,150,60,.6), var(--shadow); animation: pulseGlow 1.4s ease-in-out infinite;
+}
+.boost-timer.show { display: flex; }
+
+/* ===== Fusion ===== */
+.fuse-hint { text-align: center; color: var(--text-dim); font-size: 13px; font-weight: 700; margin-bottom: 14px; line-height: 1.4; }
+.fuse-hint b { color: var(--text); }
+.fuse-list { display: flex; flex-direction: column; gap: 10px; }
+.fuse-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px;
+  background: rgba(0,0,0,.22); border: 1px solid var(--panel-border); border-left: 4px solid var(--rar);
+}
+.fuse-row .fr-info { flex: 1; }
+.fuse-row .fr-rar { font-weight: 800; font-size: 15px; color: var(--rar); }
+.fuse-row .fr-count { font-size: 12px; color: var(--text-dim); font-weight: 700; }
+.fuse-row .fr-arrow { font-size: 13px; color: var(--text-dim); font-weight: 700; }
+.fuse-btn-do {
+  border: none; cursor: pointer; font-family: var(--font); font-weight: 800; font-size: 13px;
+  padding: 9px 16px; border-radius: 11px; color: #2a0640;
+  background: linear-gradient(180deg, #d8a5ff, #a855f7); box-shadow: 0 3px 0 #7b2fc0;
+}
+.fuse-btn-do:active { transform: translateY(2px); box-shadow: 0 1px 0 #7b2fc0; }
+.fuse-btn-do:disabled { filter: grayscale(.7) brightness(.6); box-shadow: none; cursor: default; }
+.fuse-empty { text-align: center; color: var(--text-dim); font-weight: 700; padding: 20px; }
+
+/* ===== Achievements ===== */
+.ach-count { font-size: 14px; color: var(--gold); font-weight: 800; }
+.ach-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ach-item {
+  display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 13px;
+  background: rgba(0,0,0,.22); border: 1px solid var(--panel-border);
+}
+.ach-item.done { border-color: rgba(255,200,80,.5); background: rgba(255,190,60,.08); }
+.ach-item .ai-icon { font-size: 26px; filter: grayscale(1) brightness(.7); flex: 0 0 auto; }
+.ach-item.done .ai-icon { filter: none; }
+.ach-item .ai-main { min-width: 0; }
+.ach-item .ai-name { font-weight: 800; font-size: 13px; }
+.ach-item .ai-desc { font-size: 10.5px; color: var(--text-dim); line-height: 1.2; }
+.ach-item .ai-reward { font-size: 10.5px; font-weight: 800; color: var(--gold); margin-top: 2px; }
+
+/* ===== Daily ===== */
+.daily-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.daily-tile {
+  position: relative; border-radius: 14px; padding: 10px 6px; text-align: center;
+  background: rgba(0,0,0,.25); border: 1px solid var(--panel-border);
+}
+.daily-tile.claimed { opacity: .5; }
+.daily-tile.today { border-color: var(--gold); box-shadow: 0 0 16px rgba(255,200,80,.4); animation: pulseGlow 1.6s infinite; }
+.daily-tile.locked { opacity: .6; }
+.daily-tile .dt-day { font-size: 11px; font-weight: 800; color: var(--text-dim); }
+.daily-tile .dt-icon { font-size: 26px; margin: 2px 0; }
+.daily-tile .dt-amt { font-size: 12px; font-weight: 800; }
+.daily-tile .dt-check { position: absolute; top: 4px; right: 6px; color: var(--green); font-weight: 800; }
+
+/* ===== Boost / gem shop ===== */
+.boost-list { display: flex; flex-direction: column; gap: 12px; }
+.boost-card {
+  display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 16px;
+  background: rgba(0,0,0,.22); border: 1px solid var(--panel-border);
+}
+.boost-card .bc-icon { font-size: 32px; flex: 0 0 auto; }
+.boost-card .bc-main { flex: 1; min-width: 0; }
+.boost-card .bc-name { font-weight: 800; font-size: 15px; }
+.boost-card .bc-desc { font-size: 12px; color: var(--text-dim); line-height: 1.3; }
+.boost-card button {
+  border: none; cursor: pointer; font-family: var(--font); font-weight: 800; font-size: 13px;
+  padding: 10px 14px; border-radius: 12px; white-space: nowrap;
+}
+.btn-ad { background: linear-gradient(180deg, #6fe08a, var(--green-2)); color: #06210f; box-shadow: 0 3px 0 #14803a; }
+.btn-gem { background: linear-gradient(180deg, #7ec8ff, #4f9bff); color: #05213f; box-shadow: 0 3px 0 #2f6bc9; }
+.boost-card button:active { transform: translateY(2px); }
+.boost-card button:disabled { filter: grayscale(.6) brightness(.65); box-shadow: none; cursor: default; }
+
+/* ===== Ad button (offline) ===== */
+.ad-btn { background: linear-gradient(180deg, #6fe08a, var(--green-2)); color: #06210f; box-shadow: 0 5px 0 #14803a, 0 8px 18px rgba(0,0,0,.4); margin-bottom: 8px; position: relative; }
+.ad-btn:active { box-shadow: 0 1px 0 #14803a; }
+.ad-tag { position: absolute; top: -8px; left: 12px; font-size: 9px; font-weight: 800; background: #ff5c5c; color: #fff; padding: 2px 7px; border-radius: 999px; letter-spacing: .3px; }
+.big-btn.ghost { background: rgba(255,255,255,.1); color: var(--text); box-shadow: none; }
+
 /* ===== Responsive: portrait / small ===== */
 @media (max-width: 620px) {
   .rail-btn { width: 74px; padding: 9px 5px 8px; }
@@ -289,7 +395,27 @@ html, body {
   .planet-name { padding: 5px 14px; }
   .pn-title { font-size: 15px; }
 }
+@media (max-height: 600px) {
+  .rail { gap: 8px; }
+  .rail-btn { width: 80px; padding: 7px 6px 6px; }
+  .rail-btn .rb-icon { font-size: 21px; }
+  .rail-btn .rb-label { font-size: 12px; }
+  .rail-btn .rb-cost { font-size: 11px; padding: 1px 8px; }
+  .icon-rail { gap: 7px; top: calc(140px + var(--safe-t)); }
+  .icon-btn { width: 44px; height: 44px; font-size: 20px; border-radius: 12px; }
+}
 @media (max-height: 520px) {
   .hotbar-title { display: none; }
   .inv-card { height: 56px; width: 52px; }
+  .rail-btn { width: 72px; padding: 6px 5px 5px; }
+  .rail-btn .rb-icon { font-size: 18px; }
+  .rail-btn .rb-label { font-size: 11px; }
+  .icon-btn { width: 40px; height: 40px; font-size: 18px; }
+}
+@media (max-height: 420px) {
+  .rail { gap: 6px; }
+  .rail-btn { width: 66px; }
+  .rail-btn .rb-label { display: none; }
+  .rail-btn .rb-cost { font-size: 10px; }
+  .rail-btn { padding: 8px 5px; }
 }

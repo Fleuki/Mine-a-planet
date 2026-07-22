@@ -108,9 +108,9 @@ export const UPGRADES = {
     id: 'oreValue', name: 'Ценность руды', icon: 'gem',
     desc: 'Руда продаётся дороже',
     max: 40,
-    cost: (lv) => Math.floor(45 * Math.pow(1.38, lv)),
-    value: (lv) => 1 + lv * 0.12,
-    format: (lv) => `x${(1 + lv * 0.12).toFixed(2)}`,
+    cost: (lv) => Math.floor(45 * Math.pow(1.36, lv)),
+    value: (lv) => 1 + lv * 0.15,
+    format: (lv) => `x${(1 + lv * 0.15).toFixed(2)}`,
     branch: 'mining',
   },
   storage: {
@@ -178,6 +178,64 @@ export const UPGRADE_BRANCHES = {
 // --- Planet upgrade cost ----------------------------------------------------
 export function planetUpgradeCost(tier) {
   return Math.floor(1000 * Math.pow(6.5, tier));
+}
+
+// --- Boosts -----------------------------------------------------------------
+export const BOOST = {
+  duration: 300,        // seconds of 2x income from a rewarded ad
+  mult: 2,
+  gemCost: 15,          // alternatively pay gems for the same boost
+};
+
+// Rewarded-ad / gem shop actions.
+export const GEM_SHOP = {
+  luckySpinCost: 25,    // gems: one guaranteed Epic-or-better drone
+  boostCost: BOOST.gemCost,
+};
+
+// --- Fusion (Fuse Machine) --------------------------------------------------
+// Fuse 3 drones of the same rarity into 1 random drone of the next rarity up.
+export const FUSION = {
+  need: 3,
+  // Mythic can't fuse up — recycle 3 mythics for gems instead.
+  mythicGemReward: 20,
+};
+
+// --- Daily rewards (7-day streak, then loops) --------------------------------
+export const DAILY_REWARDS = [
+  { day: 1, money: 250,     gems: 0,  icon: '💰' },
+  { day: 2, money: 800,     gems: 0,  icon: '💰' },
+  { day: 3, money: 0,       gems: 5,  icon: '◆' },
+  { day: 4, money: 3000,    gems: 0,  icon: '💰' },
+  { day: 5, money: 0,       gems: 10, icon: '◆' },
+  { day: 6, money: 12000,   gems: 0,  icon: '💰' },
+  { day: 7, money: 0,       gems: 25, icon: '🎁', boost: true },
+];
+
+// --- Achievements -----------------------------------------------------------
+// check(game) -> boolean. reward granted once on unlock.
+export const ACHIEVEMENTS = [
+  { id: 'firstSpin',  name: 'Первый ролл',      desc: 'Крутани рулетку',              icon: '🎰', reward: { money: 100 },  check: g => g.state.stats.totalSpins >= 1 },
+  { id: 'spin25',     name: 'Азартный',         desc: 'Крутани рулетку 25 раз',       icon: '🎲', reward: { gems: 3 },     check: g => g.state.stats.totalSpins >= 25 },
+  { id: 'spin150',    name: 'Крупье',           desc: 'Крутани рулетку 150 раз',      icon: '🃏', reward: { gems: 10 },    check: g => g.state.stats.totalSpins >= 150 },
+  { id: 'rare',       name: 'Редкая находка',   desc: 'Получи редкого дрона',         icon: '🔷', reward: { money: 500 },  check: g => rarityReached(g, 2) },
+  { id: 'epic',       name: 'Эпический улов',   desc: 'Получи эпического дрона',       icon: '🟣', reward: { gems: 5 },     check: g => rarityReached(g, 3) },
+  { id: 'legend',     name: 'Легенда',          desc: 'Получи легендарного дрона',    icon: '🌟', reward: { gems: 15 },    check: g => rarityReached(g, 4) },
+  { id: 'mythic',     name: 'Миф наяву',        desc: 'Получи мифического дрона',      icon: '💠', reward: { gems: 40 },    check: g => rarityReached(g, 5) },
+  { id: 'fill',       name: 'Полный ангар',     desc: 'Заполни все доки дронами',      icon: '🛰️', reward: { money: 1500 }, check: g => g.state.slots.length > 0 && g.state.slots.every(s => s.droneId) },
+  { id: 'docks10',    name: 'Расширение',       desc: 'Открой 10 доков',              icon: '🔧', reward: { gems: 5 },     check: g => g.slotCount >= 10 },
+  { id: 'fuse',       name: 'Алхимик',          desc: 'Сплавь дронов',                icon: '⚗️', reward: { money: 800 },  check: g => (g.state.stats.totalFused || 0) >= 1 },
+  { id: 'fuse10',     name: 'Мастер сплава',    desc: 'Сделай 10 слияний',            icon: '🧪', reward: { gems: 10 },    check: g => (g.state.stats.totalFused || 0) >= 10 },
+  { id: 'planet3',    name: 'Терраформер',      desc: 'Прокачай планету до яруса 3',  icon: '🌍', reward: { gems: 8 },     check: g => g.state.planetTier >= 3 },
+  { id: 'planet6',    name: 'Колонизатор',      desc: 'Прокачай планету до яруса 6',  icon: '🪐', reward: { gems: 20 },    check: g => g.state.planetTier >= 6 },
+  { id: 'planetMax',  name: 'Владыка пустоты',  desc: 'Достигни последней планеты',   icon: '🌌', reward: { gems: 60 },    check: g => g.state.planetTier >= PLANETS.length - 1 },
+  { id: 'rich1',      name: 'Первый капитал',   desc: 'Заработай 100K всего',         icon: '💵', reward: { gems: 5 },     check: g => g.state.stats.totalEarned >= 1e5 },
+  { id: 'rich2',      name: 'Магнат',           desc: 'Заработай 10M всего',          icon: '🏦', reward: { gems: 25 },    check: g => g.state.stats.totalEarned >= 1e7 },
+  { id: 'daily7',     name: 'Постоянство',      desc: 'Собери 7-дневную серию входов',icon: '📅', reward: { gems: 20 },    check: g => (g.state.daily?.streak || 0) >= 7 },
+];
+
+function rarityReached(g, order) {
+  return RARITIES[g.state.stats.bestRarity]?.order >= order;
 }
 
 // --- Number formatting ------------------------------------------------------
