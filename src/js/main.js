@@ -8,7 +8,7 @@ import { WorldRenderer } from './render.js';
 import { Particles } from './particles.js';
 import { UI } from './ui.js';
 import { audio } from './audio.js';
-import { DRONE_BY_ID, RARITIES, formatShort, EVENT_BY_ID } from './config.js';
+import { RARITIES, formatShort, EVENT_BY_ID } from './config.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -75,16 +75,8 @@ function handleTap(x, y) {
       if (slot.droneId) {
         ui.openManageSlot(i);
       } else {
-        // place first inventory drone here, or hint
-        const inv = game.state.inventory;
-        if (inv.length > 0) {
-          const item = inv[0];
-          game.placeDrone(item.uid, i);
-          ui.updateInventory();
-          ui.toast(`${DRONE_BY_ID[item.droneId].name} на посту!`);
-        } else {
-          ui.toast('Крути рулетку, чтобы получить дрона');
-        }
+        // Let the player choose which drone fills this dock.
+        ui.openPicker(i);
       }
       return true;
     }
@@ -196,6 +188,7 @@ async function boot() {
   world.setTier(game.state.planetTier);
   ui = new UI(game, particles, platform);
   ui.onPlanetChange = (tier) => { world.setTier(tier); };
+  window.__ui = window.ui = ui;      // debug/test hook
 
   // Restore an in-progress event's sky theme after a reload.
   if (game.eventActive()) { bg.setEvent(game.currentEvent().theme); ui.updateEventBanner(); }
@@ -205,6 +198,7 @@ async function boot() {
   on('gems', () => ui.updateMoney());
   on('boost', () => ui.updateBoostTimer());
   on('achievement', (a) => ui.onAchievement(a));
+  on('dex', (p) => ui.onDex(p));
   on('slots', () => { /* handled inline */ });
 
   // Resume audio on first user gesture (browser autoplay policy).
@@ -240,8 +234,13 @@ function migrate(saved) {
   merged.daily = { ...def.daily, ...(saved.daily || {}) };
   merged.boost = { ...def.boost, ...(saved.boost || {}) };
   merged.settings = { ...def.settings, ...(saved.settings || {}) };
+  merged.dex = { ...(saved.dex || {}) };
+  merged.dexSets = { ...(saved.dexSets || {}) };
   if (!Array.isArray(merged.slots) || merged.slots.length === 0) merged.slots = def.slots;
   if (!Array.isArray(merged.inventory)) merged.inventory = [];
+  // Seed the index from drones the player already owns (pre-index saves).
+  for (const s of merged.slots) if (s && s.droneId) merged.dex[s.droneId] = true;
+  for (const it of merged.inventory) if (it && it.droneId) merged.dex[it.droneId] = true;
   return merged;
 }
 

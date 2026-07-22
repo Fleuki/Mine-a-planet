@@ -6,6 +6,7 @@ import {
   PLANETS, UPGRADES, ROULETTE, planetUpgradeCost,
   BOOST, ACHIEVEMENTS, DAILY_REWARDS, FUSION, GEM_SHOP,
   STAR, droneStarMult, EVENTS, EVENT_BY_ID, EVENT_CONFIG,
+  LUCK_MAX_EXPONENT, COLLECTION,
 } from './config.js';
 
 let _uid = 1;
@@ -25,6 +26,8 @@ export function createDefaultState() {
     autosellUnlocked: false,
     spins: 0,
     stats: { totalEarned: 0, totalSpins: 0, bestRarity: 'common', dronesPlaced: 0, totalFused: 0, maxStar: 0 },
+    dex: {},                          // droneId -> true (drones ever discovered)
+    dexSets: {},                      // rarity -> true (rarity sets completed, reward claimed)
     achievements: {},                 // id -> true
     daily: { lastClaimDay: null, streak: 0 },
     boost: { until: 0 },              // ms timestamp
@@ -68,12 +71,63 @@ export class Game {
   // --- Derived getters ------------------------------------------------------
   get planet() { return PLANETS[this.state.planetTier]; }
   get miningSpeedMult() { return UPGRADES.miningSpeed.value(this.state.upgrades.miningSpeed) * this.eventSpeedMult(); }
-  get oreValueMult() { return UPGRADES.oreValue.value(this.state.upgrades.oreValue); }
+  get oreValueMult() { return UPGRADES.oreValue.value(this.state.upgrades.oreValue) * this.collectionMult(); }
   get storageCap() { return Math.floor(UPGRADES.storage.value(this.state.upgrades.storage)); }
   get luckLevel() { return this.state.upgrades.luck; }
   get rollCount() { return UPGRADES.rolls.value(this.state.upgrades.rolls); }
   get slotCount() { return UPGRADES.docks.value(this.state.upgrades.docks); }
+  get deployCount() { return UPGRADES.deploy.value(this.state.upgrades.deploy); }
   get planetValueMult() { return this.planet.valueMult; }
+
+  // --- Collection / Drone Index ---------------------------------------------
+  // Permanent income bonus from completed rarity sets.
+  collectionMult() {
+    const sets = this.completedSetCount();
+    return 1 + sets * COLLECTION.incomePerSet;
+  }
+  dexCount() {
+    const dex = this.state.dex || (this.state.dex = {});
+    const done = DRONES.filter(d => dex[d.id]).length;
+    return { done, total: DRONES.length };
+  }
+  raritySetComplete(rarity) {
+    const dex = this.state.dex || {};
+    const pool = DRONES_BY_RARITY[rarity] || [];
+    return pool.length > 0 && pool.every(d => dex[d.id]);
+  }
+  completedSetCount() {
+    return RARITY_ORDER.filter(r => this.raritySetComplete(r)).length;
+  }
+  // Register a drone as discovered. Returns list of newly-completed rarity
+  // events (with granted gems) so the UI can celebrate them.
+  discover(droneId) {
+    const dex = this.state.dex || (this.state.dex = {});
+    if (dex[droneId]) return [];
+    dex[droneId] = true;
+    const drone = DRONE_BY_ID[droneId];
+    if (!drone) return [];
+    const events = [];
+    const sets = this.state.dexSets || (this.state.dexSets = {});
+    if (!sets[drone.rarity] && this.raritySetComplete(drone.rarity)) {
+      sets[drone.rarity] = true;
+      const gems = COLLECTION.setGems[drone.rarity] || 0;
+      if (gems) this.addGems(gems);
+      events.push({ type: 'set', rarity: drone.rarity, gems });
+      // Full-index bonus.
+      if (!sets.__full && this.dexCount().done >= this.dexCount().total) {
+        sets.__full = true;
+        this.addGems(COLLECTION.fullBonusGems);
+        events.push({ type: 'full', gems: COLLECTION.fullBonusGems });
+      }
+    }
+    emit('dex', { droneId, events });
+    return events;
+  }
+  discoverMany(droneIds) {
+    let all = [];
+    for (const id of droneIds) all = all.concat(this.discover(id));
+    return all;
+  }
 
   // Ores available at the current planet tier (weighted toward the top tier).
   availableOres() {
@@ -207,7 +261,7 @@ export class Game {
   // --- Roulette -------------------------------------------------------------
   spinCost() {
     const owned = this.state.inventory.length + this.state.slots.filter(s => s.droneId).length;
-    return Math.floor(ROULETTE.baseCost * Math.pow(ROULETTE.costGrowth, Math.min(owned, 120)));
+    return Math.floor(ROULETTE.baseCost * Math.pow(ROULETTE.costGrowth, Math.min(owned, 200)));
   }
 
   canSpin() { return this.state.money >= this.spinCost(); }
@@ -225,11 +279,12 @@ export class Game {
     for (let i = 0; i < this.rollCount; i++) {
       results.push(this._rollOneDrone());
     }
-    // Track best rarity.
+    // Track best rarity + register discoveries.
     for (const d of results) {
       if (RARITIES[d.rarity].order > RARITIES[this.state.stats.bestRarity].order) {
         this.state.stats.bestRarity = d.rarity;
       }
+      this.discover(d.id);
     }
     return results;
   }
@@ -240,7 +295,10 @@ export class Game {
     let total = 0;
     const table = RARITY_ORDER.map(rid => {
       const base = RARITIES[rid].weight;
-      const boost = RARITIES[rid].order === 0 ? 1 : Math.pow(luck, RARITIES[rid].order);
+      // Cap the luck exponent so the very top tiers don't overtake the table at
+      // high luck — they stay rare through their tiny base weight instead.
+      const exp = Math.min(RARITIES[rid].order, LUCK_MAX_EXPONENT);
+      const boost = exp === 0 ? 1 : Math.pow(luck, exp);
       const w = base * boost;
       total += w;
       return { rid, w };
@@ -274,6 +332,7 @@ export class Game {
     if (RARITIES[drone.rarity].order > RARITIES[this.state.stats.bestRarity].order) {
       this.state.stats.bestRarity = drone.rarity;
     }
+    this.discover(drone.id);
     return drone;
   }
 
@@ -292,6 +351,40 @@ export class Game {
     this.state.stats.dronesPlaced++;
     emit('slots');
     return true;
+  }
+
+  // How many copies of a given drone+star sit in the hangar right now.
+  inventoryCount(droneId, star = 0) {
+    star = star || 0;
+    return this.state.inventory.reduce((n, d) => n + (d.droneId === droneId && (d.star || 0) === star ? 1 : 0), 0);
+  }
+
+  // Batch-place up to `maxCount` copies of a drone (droneId + star) from the
+  // hangar into free docks. If `firstSlotIndex` is given, that dock is filled
+  // first (used when the player tapped a specific empty dock). Returns the
+  // number actually placed.
+  deployDrones(droneId, star, maxCount, firstSlotIndex = -1) {
+    star = star || 0;
+    let placed = 0;
+    const fillSlot = (slotIndex) => {
+      const slot = this.state.slots[slotIndex];
+      if (!slot || slot.droneId) return false;
+      const invIdx = this.state.inventory.findIndex(d => d.droneId === droneId && (d.star || 0) === star);
+      if (invIdx < 0) return false;
+      const inv = this.state.inventory[invIdx];
+      slot.droneId = inv.droneId; slot.uid = inv.uid; slot.star = inv.star || 0; slot.progress = 0;
+      this.state.inventory.splice(invIdx, 1);
+      this.state.stats.dronesPlaced++;
+      placed++;
+      return true;
+    };
+    if (firstSlotIndex >= 0 && placed < maxCount) fillSlot(firstSlotIndex);
+    while (placed < maxCount) {
+      const free = this.state.slots.find(s => !s.droneId);
+      if (!free || !fillSlot(free.index)) break;
+    }
+    if (placed) emit('slots');
+    return placed;
   }
 
   // Auto-place a drone into the first free slot; returns slot index or -1.
@@ -428,6 +521,7 @@ export class Game {
     if (RARITIES[result.rarity].order > RARITIES[this.state.stats.bestRarity].order) {
       this.state.stats.bestRarity = result.rarity;
     }
+    this.discover(result.id);
     emit('fuse', { result });
     return { result };
   }

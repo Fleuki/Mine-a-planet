@@ -19,7 +19,8 @@ const port = server.address().port;
 const base = `http://localhost:${port}`;
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args:['--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 900, height: 500 }, deviceScaleFactor: 2 });
+// Portrait phone viewport to validate the mobile HUD layout.
+const page = await browser.newPage({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 2 });
 
 const errors = [];
 page.on('console', m => { if (m.type() === 'error') errors.push('CONSOLE: ' + m.text()); });
@@ -55,6 +56,41 @@ await page.waitForTimeout(400);
 await page.screenshot({ path: 'tools/shot_5_planet.png' });
 await page.click('#planetModal .close');
 await page.waitForTimeout(200);
+
+// Give lots of drones + a deploy level so we can test picker/collection.
+await page.evaluate(() => {
+  const g = window.__game;
+  for (let i = 0; i < 30; i++) g.spin && g.state.money < 1 ? null : null;
+  // directly grant a spread of drones to the hangar
+  const ids = ['scout','pebble','twin','buzz','quad','ripper','magma','hexa','nova','quantum','omega','monolith','celestia'];
+  for (const id of ids) { g.addDroneToInventory(id); g.discover(id); }
+  g.state.upgrades.deploy = 2;   // 3x deploy
+  window.ui && window.ui.updateInventory && window.ui.updateInventory();
+});
+
+// Collection index
+await page.click('#btnCollection');
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'tools/shot_7_collection.png' });
+await page.click('#collectionModal .close');
+await page.waitForTimeout(200);
+
+// Dock picker: tap an empty dock near the planet ring (bottom slot area)
+await page.evaluate(() => { window.ui && window.ui.openPicker && window.ui.openPicker(0); });
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'tools/shot_8_picker.png' });
+await page.evaluate(() => document.querySelector('#pickModal').classList.remove('open'));
+await page.waitForTimeout(200);
+
+// Multi-reel roulette (rolls upgrade -> multiple reels)
+await page.evaluate(() => { const g = window.__game; g.state.upgrades.rolls = 3; window.ui.updateRailCosts(); });
+await page.click('#btnRoulette');
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'tools/shot_9_multireel_idle.png' });
+const canSpin2 = await page.evaluate(() => !document.querySelector('#doSpin').disabled);
+if (canSpin2) { await page.click('#doSpin'); await page.waitForTimeout(2000); await page.screenshot({ path: 'tools/shot_10_multireel_spin.png' }); await page.waitForTimeout(3000); await page.screenshot({ path: 'tools/shot_11_multireel_result.png' }); }
+await page.click('#rouletteModal .close');
+await page.waitForTimeout(300);
 
 await page.waitForTimeout(500);
 await page.screenshot({ path: 'tools/shot_6_final.png' });

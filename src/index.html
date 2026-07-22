@@ -24,8 +24,8 @@
 
   <!-- ===== HUD overlay ===== -->
   <div id="hud">
-    <!-- Top-left: currencies -->
-    <div class="topbar">
+    <!-- Top-left: currencies (stacked so they stay clear of the cargo card) -->
+    <div class="topbar" id="topbar">
       <div class="stat money" id="moneyStat">
         <span class="coin">₡</span>
         <span class="val" id="moneyVal">0</span>
@@ -36,13 +36,7 @@
       </div>
     </div>
 
-    <!-- Top-center: planet nameplate -->
-    <div class="planet-name" id="planetName">
-      <span class="pn-title">Пустошь</span>
-      <span class="pn-sub">Планета I</span>
-    </div>
-
-    <!-- Top-right: cargo -->
+    <!-- Top-right: cargo + sell -->
     <div class="cargo" id="cargo">
       <div class="cargo-head">
         <span>Трюм</span>
@@ -50,6 +44,12 @@
       </div>
       <div class="cargo-bar"><div class="cargo-fill" id="cargoFill"></div></div>
       <button class="sell-btn" id="sellBtn">Продать <span id="sellValue">₡0</span></button>
+    </div>
+
+    <!-- Planet nameplate: floats above the planet, clear of both corners -->
+    <div class="planet-name" id="planetName">
+      <span class="pn-title">Пустошь</span>
+      <span class="pn-sub">Планета I</span>
     </div>
 
     <!-- Left rail: main action buttons -->
@@ -81,6 +81,9 @@
       </button>
       <button class="icon-btn" id="btnAch" title="Достижения">
         <span>🏆</span><span class="badge" id="achBadge"></span>
+      </button>
+      <button class="icon-btn" id="btnCollection" title="Индекс дронов">
+        <span>📖</span><span class="badge" id="colBadge"></span>
       </button>
       <button class="icon-btn" id="btnBoost" title="Ускорители">
         <span>⚡</span>
@@ -117,14 +120,15 @@
     <div class="modal roulette-modal">
       <button class="close" data-close></button>
       <h2>Рулетка дронов</h2>
-      <div class="reel-viewport">
+      <div class="reel-viewport" id="reelViewport">
         <div class="reel-pointer"></div>
-        <div class="reel" id="reel"></div>
+        <div class="reel-line"></div>
+        <div class="reel-stack" id="reelStack"></div>
       </div>
       <div class="roulette-foot">
         <div class="odds" id="odds"></div>
         <button class="big-btn" id="doSpin">
-          Крутить <span id="doSpinCost">₡50</span>
+          Крутить <span class="multi-tag" id="multiTag"></span> <span id="doSpinCost">₡50</span>
         </button>
       </div>
       <div class="spin-results" id="spinResults"></div>
@@ -157,6 +161,26 @@
       <button class="close" data-close></button>
       <h2 id="placeTitle">Дрон</h2>
       <div class="place-body" id="placeBody"></div>
+    </div>
+  </div>
+
+  <!-- ===== Dock picker sheet: choose which drone to deploy ===== -->
+  <div class="overlay" id="pickModal">
+    <div class="modal pick-modal">
+      <button class="close" data-close></button>
+      <h2 id="pickTitle">Выберите бур</h2>
+      <p class="pick-sub" id="pickSub"></p>
+      <div class="pick-grid" id="pickGrid"></div>
+    </div>
+  </div>
+
+  <!-- ===== Collection / Drone Index modal ===== -->
+  <div class="overlay" id="collectionModal">
+    <div class="modal collection-modal">
+      <button class="close" data-close></button>
+      <h2>Индекс дронов <span class="ach-count" id="colCount"></span></h2>
+      <div class="col-bonus" id="colBonus"></div>
+      <div class="col-list" id="colList"></div>
     </div>
   </div>
 

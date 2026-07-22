@@ -6,15 +6,22 @@
 // --- Rarities ---------------------------------------------------------------
 // Order matters (index used for comparisons / sorting).
 export const RARITIES = {
-  common:    { id: 'common',    name: 'Обычный',      color: '#9fb3c8', glow: '#c4d3e0', weight: 1000, order: 0 },
-  uncommon:  { id: 'uncommon',  name: 'Необычный',    color: '#4ade80', glow: '#86efac', weight: 420,  order: 1 },
-  rare:      { id: 'rare',      name: 'Редкий',       color: '#38bdf8', glow: '#7dd3fc', weight: 150,  order: 2 },
-  epic:      { id: 'epic',      name: 'Эпический',    color: '#c084fc', glow: '#e9d5ff', weight: 44,   order: 3 },
-  legendary: { id: 'legendary', name: 'Легендарный',  color: '#fbbf24', glow: '#fde68a', weight: 9,    order: 4 },
-  mythic:    { id: 'mythic',    name: 'Мифический',    color: '#fb7185', glow: '#fecdd3', weight: 1.4,  order: 5 },
+  common:    { id: 'common',    name: 'Обычный',      color: '#9fb3c8', glow: '#c4d3e0', weight: 1000,  order: 0 },
+  uncommon:  { id: 'uncommon',  name: 'Необычный',    color: '#4ade80', glow: '#86efac', weight: 420,   order: 1 },
+  rare:      { id: 'rare',      name: 'Редкий',       color: '#38bdf8', glow: '#7dd3fc', weight: 150,    order: 2 },
+  epic:      { id: 'epic',      name: 'Эпический',    color: '#c084fc', glow: '#e9d5ff', weight: 44,     order: 3 },
+  legendary: { id: 'legendary', name: 'Легендарный',  color: '#fbbf24', glow: '#fde68a', weight: 9,      order: 4 },
+  mythic:    { id: 'mythic',    name: 'Мифический',    color: '#fb7185', glow: '#fecdd3', weight: 1.5,    order: 5 },
+  ancient:   { id: 'ancient',   name: 'Древний',      color: '#ff8a3d', glow: '#ffd0a0', weight: 0.34,   order: 6 },
+  celestial: { id: 'celestial', name: 'Небесный',     color: '#7df9ff', glow: '#e2ffff', weight: 0.055,  order: 7 },
 };
 
-export const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+export const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'ancient', 'celestial'];
+
+// Luck raises the weight of rarer tiers. The exponent is capped so the two
+// top tiers stay genuinely rare even at max luck — they get rarer only through
+// their tiny base weight, not by being excluded from the luck bonus.
+export const LUCK_MAX_EXPONENT = 4;
 
 // --- Ores -------------------------------------------------------------------
 // tier = which planet level starts producing this ore. value = base sell price.
@@ -53,27 +60,40 @@ export const PLANETS = [
 // Effective ore/sec = power / interval, scaled by global mining-speed upgrade.
 export const DRONES = [
   // Common
-  { id: 'scout',    name: 'Скаут',        rarity: 'common',    power: 1,   interval: 1.6, shape: 'auger' },
-  { id: 'pebble',   name: 'Галечник',     rarity: 'common',    power: 2,   interval: 1.5, shape: 'drill' },
-  { id: 'rustbit',  name: 'Ржавый Бит',   rarity: 'common',    power: 3,   interval: 1.7, shape: 'auger' },
+  { id: 'scout',    name: 'Скаут',        rarity: 'common',    power: 1,    interval: 1.6, shape: 'auger' },
+  { id: 'pebble',   name: 'Галечник',     rarity: 'common',    power: 2,    interval: 1.5, shape: 'drill' },
+  { id: 'rustbit',  name: 'Ржавый Бит',   rarity: 'common',    power: 3,    interval: 1.7, shape: 'auger' },
+  { id: 'chipper',  name: 'Чиппер',       rarity: 'common',    power: 4,    interval: 1.6, shape: 'drill' },
   // Uncommon
-  { id: 'twin',     name: 'Твин-Авгер',   rarity: 'uncommon',  power: 6,   interval: 1.4, shape: 'twin' },
-  { id: 'copperjaw',name: 'Медный Клык',  rarity: 'uncommon',  power: 9,   interval: 1.4, shape: 'drill' },
-  { id: 'buzz',     name: 'Баззсоу',      rarity: 'uncommon',  power: 12,  interval: 1.2, shape: 'saw' },
+  { id: 'twin',     name: 'Твин-Авгер',   rarity: 'uncommon',  power: 6,    interval: 1.4, shape: 'twin' },
+  { id: 'copperjaw',name: 'Медный Клык',  rarity: 'uncommon',  power: 9,    interval: 1.4, shape: 'drill' },
+  { id: 'buzz',     name: 'Баззсоу',      rarity: 'uncommon',  power: 12,   interval: 1.2, shape: 'saw' },
+  { id: 'sander',   name: 'Шлифовщик',    rarity: 'uncommon',  power: 15,   interval: 1.3, shape: 'saw' },
   // Rare
-  { id: 'quad',     name: 'Квад-Дрилл',   rarity: 'rare',      power: 22,  interval: 1.2, shape: 'quad' },
-  { id: 'ionlance', name: 'Ион-Ланс',     rarity: 'rare',      power: 32,  interval: 1.1, shape: 'laser' },
-  { id: 'ripper',   name: 'Риппер',       rarity: 'rare',      power: 44,  interval: 1.0, shape: 'saw' },
+  { id: 'quad',     name: 'Квад-Дрилл',   rarity: 'rare',      power: 22,   interval: 1.2, shape: 'quad' },
+  { id: 'ionlance', name: 'Ион-Ланс',     rarity: 'rare',      power: 32,   interval: 1.1, shape: 'laser' },
+  { id: 'ripper',   name: 'Риппер',       rarity: 'rare',      power: 44,   interval: 1.0, shape: 'saw' },
+  { id: 'corebit',  name: 'Кор-Бит',      rarity: 'rare',      power: 55,   interval: 1.05,shape: 'drill' },
   // Epic
-  { id: 'magma',    name: 'Магма-Бур',    rarity: 'epic',      power: 85,  interval: 1.0, shape: 'drill' },
-  { id: 'plasmator',name: 'Плазматор',    rarity: 'epic',      power: 120, interval: 0.9, shape: 'laser' },
-  { id: 'hexa',     name: 'Гекса-Корер',  rarity: 'epic',      power: 165, interval: 0.9, shape: 'quad' },
+  { id: 'magma',    name: 'Магма-Бур',    rarity: 'epic',      power: 85,   interval: 1.0, shape: 'drill' },
+  { id: 'plasmator',name: 'Плазматор',    rarity: 'epic',      power: 120,  interval: 0.9, shape: 'laser' },
+  { id: 'hexa',     name: 'Гекса-Корер',  rarity: 'epic',      power: 165,  interval: 0.9, shape: 'quad' },
+  { id: 'voidsaw',  name: 'Войд-Пила',    rarity: 'epic',      power: 210,  interval: 0.85,shape: 'saw' },
   // Legendary
-  { id: 'nova',     name: 'Нова-Авгер',   rarity: 'legendary', power: 340, interval: 0.8, shape: 'twin' },
-  { id: 'singular', name: 'Сингулярность',rarity: 'legendary', power: 520, interval: 0.75,shape: 'laser' },
+  { id: 'nova',     name: 'Нова-Авгер',   rarity: 'legendary', power: 340,  interval: 0.8, shape: 'twin' },
+  { id: 'singular', name: 'Сингулярность',rarity: 'legendary', power: 520,  interval: 0.75,shape: 'laser' },
+  { id: 'titan',    name: 'Титан-Бур',    rarity: 'legendary', power: 700,  interval: 0.72,shape: 'quad' },
+  { id: 'eclipse',  name: 'Эклипс',       rarity: 'legendary', power: 900,  interval: 0.7, shape: 'laser' },
   // Mythic
-  { id: 'quantum',  name: 'Квант-Жнец',   rarity: 'mythic',    power: 1300,interval: 0.7, shape: 'quad' },
-  { id: 'devourer', name: 'Пожиратель',   rarity: 'mythic',    power: 2100,interval: 0.65,shape: 'laser' },
+  { id: 'quantum',  name: 'Квант-Жнец',   rarity: 'mythic',    power: 1300, interval: 0.7, shape: 'quad' },
+  { id: 'devourer', name: 'Пожиратель',   rarity: 'mythic',    power: 2100, interval: 0.65,shape: 'laser' },
+  { id: 'omega',    name: 'Омега-Корер',  rarity: 'mythic',    power: 2900, interval: 0.6, shape: 'quad' },
+  // Ancient
+  { id: 'progenitor',name:'Прародитель',  rarity: 'ancient',   power: 4200, interval: 0.6, shape: 'laser' },
+  { id: 'monolith', name: 'Монолит',      rarity: 'ancient',   power: 5600, interval: 0.55,shape: 'quad' },
+  // Celestial
+  { id: 'starforge',name: 'Звёздный Горн',rarity: 'celestial', power: 8500, interval: 0.5, shape: 'laser' },
+  { id: 'celestia', name: 'Селестия',     rarity: 'celestial', power: 12000,interval: 0.5, shape: 'quad' },
 ];
 
 export const ORE_BY_ID = Object.fromEntries(ORES.map(o => [o.id, o]));
@@ -130,6 +150,15 @@ export const UPGRADES = {
     cost: (lv) => Math.floor(500 * Math.pow(1.7, lv)),
     value: (lv) => 5 + lv,                    // total slots
     format: (lv) => `${5 + lv} слотов`,
+    branch: 'logistics',
+  },
+  deploy: {
+    id: 'deploy', name: 'Мульти-установка', icon: 'deploy',
+    desc: 'Ставить несколько буров за одно нажатие',
+    max: 5,                                   // 1 -> 6 at once
+    cost: (lv) => Math.floor(800 * Math.pow(1.85, lv)),
+    value: (lv) => 1 + lv,                    // drones placed per tap
+    format: (lv) => `${1 + lv}× за раз`,
     branch: 'logistics',
   },
   luck: {
@@ -244,6 +273,22 @@ export const STAR = {
 };
 export function droneStarMult(star) { return Math.pow(1.5, star || 0); }
 
+// --- Collection / Drone Index ------------------------------------------------
+// Discovering (ever owning) a drone adds it to the index. Completing a full
+// rarity set grants a one-time gem reward and a permanent income bonus, giving
+// players a reason to chase every drone — including duplicates for fusion.
+export const COLLECTION = {
+  // Gems granted the first time an entire rarity set is completed.
+  setGems: {
+    common: 3, uncommon: 5, rare: 8, epic: 14,
+    legendary: 25, mythic: 45, ancient: 80, celestial: 150,
+  },
+  // Each completed rarity set adds this to a permanent ore-value multiplier.
+  incomePerSet: 0.05,
+  // Bonus gems for a 100% complete index.
+  fullBonusGems: 300,
+};
+
 // --- Daily rewards (7-day streak, then loops) --------------------------------
 export const DAILY_REWARDS = [
   { day: 1, money: 250,     gems: 0,  icon: '💰' },
@@ -265,6 +310,11 @@ export const ACHIEVEMENTS = [
   { id: 'epic',       name: 'Эпический улов',   desc: 'Получи эпического дрона',       icon: '🟣', reward: { gems: 5 },     check: g => rarityReached(g, 3) },
   { id: 'legend',     name: 'Легенда',          desc: 'Получи легендарного дрона',    icon: '🌟', reward: { gems: 15 },    check: g => rarityReached(g, 4) },
   { id: 'mythic',     name: 'Миф наяву',        desc: 'Получи мифического дрона',      icon: '💠', reward: { gems: 40 },    check: g => rarityReached(g, 5) },
+  { id: 'ancient',    name: 'Древняя мощь',     desc: 'Получи древнего дрона',         icon: '🗿', reward: { gems: 70 },    check: g => rarityReached(g, 6) },
+  { id: 'celestial',  name: 'Небесное чудо',    desc: 'Получи небесного дрона',        icon: '🌠', reward: { gems: 120 },   check: g => rarityReached(g, 7) },
+  { id: 'dex10',      name: 'Коллекционер',     desc: 'Открой 10 дронов в индексе',    icon: '📖', reward: { gems: 8 },     check: g => g.dexCount().done >= 10 },
+  { id: 'dex20',      name: 'Хранитель дронов', desc: 'Открой 20 дронов в индексе',    icon: '📚', reward: { gems: 20 },    check: g => g.dexCount().done >= 20 },
+  { id: 'dexAll',     name: 'Полный индекс',    desc: 'Открой всех дронов',            icon: '🏅', reward: { gems: 100 },   check: g => g.dexCount().done >= g.dexCount().total },
   { id: 'fill',       name: 'Полный ангар',     desc: 'Заполни все доки дронами',      icon: '🛰️', reward: { money: 1500 }, check: g => g.state.slots.length > 0 && g.state.slots.every(s => s.droneId) },
   { id: 'docks10',    name: 'Расширение',       desc: 'Открой 10 доков',              icon: '🔧', reward: { gems: 5 },     check: g => g.slotCount >= 10 },
   { id: 'fuse',       name: 'Алхимик',          desc: 'Сплавь дронов',                icon: '⚗️', reward: { money: 800 },  check: g => (g.state.stats.totalFused || 0) >= 1 },

@@ -2,10 +2,10 @@
 //  UI controller: HUD, modals, roulette reel, upgrade tree, planet panel.
 // ============================================================================
 import {
-  UPGRADES, UPGRADE_BRANCHES, RARITIES, RARITY_ORDER, DRONE_BY_ID,
+  UPGRADES, UPGRADE_BRANCHES, RARITIES, RARITY_ORDER, DRONE_BY_ID, DRONES,
   DRONES_BY_RARITY, PLANETS, ROULETTE, formatShort,
   ACHIEVEMENTS, DAILY_REWARDS, FUSION, BOOST, GEM_SHOP,
-  STAR, droneStarMult,
+  STAR, droneStarMult, LUCK_MAX_EXPONENT, COLLECTION,
 } from './config.js';
 import { drawDroneIcon, drawPlanetIcon } from './sprites.js';
 import { audio } from './audio.js';
@@ -22,6 +22,7 @@ const UP_ICONS = {
   dice:   '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="#eee"/><circle cx="8" cy="8" r="1.6" fill="#333"/><circle cx="16" cy="8" r="1.6" fill="#333"/><circle cx="12" cy="12" r="1.6" fill="#333"/><circle cx="8" cy="16" r="1.6" fill="#333"/><circle cx="16" cy="16" r="1.6" fill="#333"/></svg>',
   auto:   '<svg viewBox="0 0 24 24" fill="none"><path d="M12 4a8 8 0 1 1-7 4" stroke="#4ade80" stroke-width="2.2" stroke-linecap="round"/><path d="M12 2v5l4-2.5L12 2Z" fill="#4ade80"/></svg>',
   moon:   '<svg viewBox="0 0 24 24"><path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10Z" fill="#c4b5fd"/></svg>',
+  deploy: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 2 4 6v6c0 4.4 3.4 8.3 8 10 4.6-1.7 8-5.6 8-10V6l-8-4Z" fill="#38bdf8" opacity=".25"/><path d="m8.5 12 2.5 2.5L16 9" stroke="#7dd3fc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
 export class UI {
@@ -50,6 +51,7 @@ export class UI {
     // Icon cluster
     $('#btnDaily').onclick = () => { audio.click(); this.openDaily(); };
     $('#btnAch').onclick = () => { audio.click(); this.openAchievements(); };
+    $('#btnCollection').onclick = () => { audio.click(); this.openCollection(); };
     $('#btnBoost').onclick = () => { audio.click(); this.openBoost(); };
     $('#btnSound').onclick = () => this.toggleSound();
     $('#claimDaily').onclick = () => this.doClaimDaily();
@@ -236,9 +238,10 @@ export class UI {
   openRoulette() {
     this.renderOdds();
     $('#doSpinCost').textContent = money(this.game.spinCost());
+    $('#multiTag').textContent = this.game.rollCount > 1 ? `×${this.game.rollCount}` : '';
     $('#doSpin').disabled = !this.game.canSpin();
     $('#spinResults').innerHTML = '';
-    this._fillReel(28);
+    this._buildReels(this.game.rollCount);       // idle filler reels
     $('#rouletteModal').classList.add('open');
   }
 
@@ -247,7 +250,8 @@ export class UI {
     let total = 0;
     const ws = RARITY_ORDER.map(rid => {
       const base = RARITIES[rid].weight;
-      const w = base * (RARITIES[rid].order === 0 ? 1 : Math.pow(luck, RARITIES[rid].order));
+      const exp = Math.min(RARITIES[rid].order, LUCK_MAX_EXPONENT);
+      const w = base * (exp === 0 ? 1 : Math.pow(luck, exp));
       total += w; return { rid, w };
     });
     const html = ws.map(({ rid, w }) => {
@@ -258,8 +262,33 @@ export class UI {
     $('#odds').innerHTML = html;
   }
 
-  _fillReel(count, finalDrone) {
-    const reel = $('#reel');
+  // Build `n` stacked reel rows (one per rolled drone), sized to fit the
+  // viewport. When `finals` is given, each reel is seeded to land on its own
+  // result near the pointer. Returns [{reel, itemW}] for the animator.
+  _buildReels(n, finals) {
+    n = Math.max(1, Math.min(n, 6));
+    const stack = $('#reelStack');
+    stack.innerHTML = '';
+    // Row height shrinks as more reels are shown so they all fit on screen.
+    const rowH = n <= 1 ? 116 : n === 2 ? 76 : n === 3 ? 60 : n === 4 ? 52 : 46;
+    const iconSize = Math.round(rowH * 0.58);
+    const itemW = Math.round(Math.max(78, Math.min(120, rowH * 1.35)));
+    const reels = [];
+    for (let r = 0; r < n; r++) {
+      const row = document.createElement('div');
+      row.className = 'reel-row';
+      row.style.height = rowH + 'px';
+      const reel = document.createElement('div');
+      reel.className = 'reel';
+      row.appendChild(reel);
+      stack.appendChild(row);
+      this._populateReel(reel, 30, itemW, iconSize, finals ? finals[r] : null);
+      reels.push({ reel, itemW });
+    }
+    return reels;
+  }
+
+  _populateReel(reel, count, itemW, iconSize, finalDrone) {
     reel.style.transition = 'none';
     reel.style.transform = 'translateX(0)';
     reel.innerHTML = '';
@@ -267,16 +296,16 @@ export class UI {
     for (let i = 0; i < count; i++) {
       const rid = weightedPreviewRarity();
       const pool = DRONES_BY_RARITY[rid];
-      const d = pool[Math.floor(Math.random() * pool.length)];
-      items.push(d);
+      items.push(pool[Math.floor(Math.random() * pool.length)]);
     }
     if (finalDrone) items[count - 5] = finalDrone;   // land near the pointer
     for (const d of items) {
       const rar = RARITIES[d.rarity];
       const item = document.createElement('div');
       item.className = 'reel-item';
+      item.style.flex = `0 0 ${itemW}px`;
       const cv = document.createElement('canvas');
-      cv.style.width = '68px'; cv.style.height = '68px';
+      cv.style.width = iconSize + 'px'; cv.style.height = iconSize + 'px';
       item.appendChild(cv);
       const nm = document.createElement('div');
       nm.className = 'ri-name'; nm.textContent = d.name; nm.style.color = rar.color;
@@ -296,40 +325,38 @@ export class UI {
     $('#spinResults').innerHTML = '';
     this.updateMoney();
 
-    // Show the first result on the reel with a spin animation.
-    const headline = results[0];
-    const items = this._fillReel(30, headline);
-    const reel = $('#reel');
-    const itemW = 110;
-    const targetIndex = 25;                 // where headline sits (count-5)
-    const viewport = reel.parentElement.clientWidth;
-    const finalX = -(targetIndex * itemW) + viewport / 2 - itemW / 2;
-
-    reel.getBoundingClientRect();           // force reflow
-    reel.style.transition = 'transform 3.4s cubic-bezier(.12,.7,.15,1)';
-    reel.style.transform = `translateX(${finalX + (Math.random() * 30 - 15)}px)`;
-    audio.spinTicks(3400);
+    // One reel per rolled drone — each lands on its own result.
+    const reels = this._buildReels(results.length, results);
+    const viewport = $('#reelViewport').clientWidth;
+    const targetIndex = 25;                 // where each result sits (count-5)
+    let maxMs = 0;
+    reels.forEach((rr, i) => {
+      const finalX = -(targetIndex * rr.itemW) + viewport / 2 - rr.itemW / 2;
+      rr.reel.getBoundingClientRect();      // force reflow
+      const dur = 2.9 + i * 0.4;            // stagger so reels land one by one
+      maxMs = Math.max(maxMs, dur * 1000);
+      rr.reel.style.transition = `transform ${dur}s cubic-bezier(.12,.7,.15,1)`;
+      rr.reel.style.transform = `translateX(${finalX + (Math.random() * 24 - 12)}px)`;
+    });
+    audio.spinTicks(maxMs);
 
     setTimeout(() => {
       this.spinning = false;
       $('#doSpin').disabled = !this.game.canSpin();
       $('#doSpinCost').textContent = money(this.game.spinCost());
       this._showSpinResults(results);
-      // Auto-place drones into free slots (or inventory if full).
-      for (const d of results) {
-        const idx = this.game.autoPlace(d.id);
-        if (idx < 0) { /* went to inventory */ }
-      }
+      // Auto-place drones into free slots (or hangar if full).
+      for (const d of results) this.game.autoPlace(d.id);
       this.updateInventory();
       this.updateRailCosts();
-      // celebrate rare pulls
+      // celebrate the best pull
       const best = results.reduce((a, b) => RARITIES[b.rarity].order > RARITIES[a.rarity].order ? b : a);
       audio.win(RARITIES[best.rarity].order);
       if (RARITIES[best.rarity].order >= 3) {
         this.toast(`${RARITIES[best.rarity].name}: ${best.name}!`);
       }
       this.game.evaluateAchievements();
-    }, 3500);
+    }, maxMs + 200);
   }
 
   _showSpinResults(results) {
@@ -492,23 +519,24 @@ export class UI {
     body.appendChild(preview);
     requestAnimationFrame(() => drawDroneIcon(cv, drone.id, star));
 
-    const hasFree = this.game.state.slots.some(s => !s.droneId);
+    const freeSlots = this.game.state.slots.filter(s => !s.droneId).length;
+    const hasFree = freeSlots > 0;
+    // How many copies of this exact drone we'd place in one tap.
+    const copies = this.game.inventoryCount(item.droneId, star);
+    const batch = Math.min(this.game.deployCount, copies, freeSlots);
     const actions = document.createElement('div');
     actions.className = 'place-actions';
     const placeBtn = document.createElement('button');
     placeBtn.className = 'btn-place';
-    placeBtn.textContent = hasFree ? 'Поставить на планету' : 'Нет свободных доков';
+    placeBtn.textContent = !hasFree ? 'Нет свободных доков'
+      : batch > 1 ? `Поставить ×${batch}` : 'Поставить на планету';
     placeBtn.disabled = !hasFree;
     placeBtn.onclick = () => {
-      const idx = this.game.autoPlace(item.droneId, item.uid);
-      // remove from inventory (autoPlace with existing uid places it, but the
-      // inventory copy remains — remove it here)
-      const inv = this.game.state.inventory;
-      const at = inv.findIndex(d => d.uid === item.uid);
-      if (at >= 0 && idx >= 0) inv.splice(at, 1);
+      const n = this.game.deployDrones(item.droneId, star, this.game.deployCount);
       this.updateInventory();
       $('#placeModal').classList.remove('open');
-      this.toast(`${DRONE_BY_ID[item.droneId].name} на посту!`);
+      this.toast(n > 1 ? `${drone.name} ×${n} на посту!` : `${drone.name} на посту!`);
+      this.game.evaluateAchievements();
     };
     const scrapBtn = document.createElement('button');
     scrapBtn.className = 'btn-scrap';
@@ -533,6 +561,73 @@ export class UI {
     body.appendChild(hint);
 
     $('#placeModal').classList.add('open');
+  }
+
+  // ---- Dock picker: choose which hangar drone fills a tapped empty dock -----
+  openPicker(slotIndex) {
+    const inv = this.game.state.inventory;
+    if (inv.length === 0) { this.toast('Крути рулетку, чтобы получить дронов'); return; }
+
+    // Group identical drones (same id + star) so the picker is compact.
+    const groups = new Map();
+    for (const it of inv) {
+      const star = it.star || 0;
+      const key = it.droneId + ':' + star;
+      if (!groups.has(key)) groups.set(key, { droneId: it.droneId, star, count: 0 });
+      groups.get(key).count++;
+    }
+    const list = [...groups.values()].sort((a, b) => {
+      const da = DRONE_BY_ID[a.droneId], db = DRONE_BY_ID[b.droneId];
+      const oa = RARITIES[da.rarity].order, ob = RARITIES[db.rarity].order;
+      if (ob !== oa) return ob - oa;                         // rarer first
+      const pa = da.power * droneStarMult(a.star) / da.interval;
+      const pb = db.power * droneStarMult(b.star) / db.interval;
+      return pb - pa;                                        // stronger first
+    });
+
+    const freeSlots = this.game.state.slots.filter(s => !s.droneId).length;
+    const deploy = this.game.deployCount;
+    $('#pickTitle').textContent = 'Выберите бур для дока';
+    $('#pickSub').textContent = deploy > 1
+      ? `Мульти-установка: до ${deploy}× за раз`
+      : 'Прокачай «Мульти-установку», чтобы ставить несколько сразу';
+    const grid = $('#pickGrid');
+    grid.innerHTML = '';
+
+    for (const g of list) {
+      const drone = DRONE_BY_ID[g.droneId];
+      const rar = RARITIES[drone.rarity];
+      const batch = Math.min(deploy, g.count, freeSlots);
+      const dps = (drone.power * droneStarMult(g.star) / drone.interval * this.game.miningSpeedMult).toFixed(1);
+      const card = document.createElement('div');
+      card.className = 'pick-card';
+      card.style.setProperty('--rar', rar.color);
+      const cv = document.createElement('canvas');
+      cv.className = 'pk-canvas'; cv.style.width = '54px'; cv.style.height = '54px';
+      card.appendChild(cv);
+      const info = document.createElement('div');
+      info.className = 'pk-info';
+      info.innerHTML = `
+        <div class="pk-name">${drone.name} ${g.star > 0 ? `<span style="color:#ffd54a">${starStr(g.star)}</span>` : ''}</div>
+        <div class="pk-rar" style="color:${rar.color}">${rar.name} · ${dps}/с</div>`;
+      card.appendChild(info);
+      const qty = document.createElement('div');
+      qty.className = 'pk-qty';
+      qty.innerHTML = `×${g.count}${batch > 1 ? `<span class="pk-batch">ставит ${batch}</span>` : ''}`;
+      card.appendChild(qty);
+      grid.appendChild(card);
+      requestAnimationFrame(() => drawDroneIcon(cv, drone.id, g.star));
+      card.onclick = () => {
+        const n = this.game.deployDrones(g.droneId, g.star, this.game.deployCount, slotIndex);
+        if (n <= 0) { audio.error(); return; }
+        audio.upgrade();
+        this.updateInventory();
+        $('#pickModal').classList.remove('open');
+        this.toast(n > 1 ? `${drone.name} ×${n} на посту!` : `${drone.name} на посту!`);
+        this.game.evaluateAchievements();
+      };
+    }
+    $('#pickModal').classList.add('open');
   }
 
   // Called when a placed drone (on the planet ring) is tapped.
@@ -721,6 +816,78 @@ export class UI {
     const reward = a.reward?.gems ? `+${a.reward.gems} ◆` : a.reward?.money ? `+${money(a.reward.money)}` : '';
     this.toast(`🏆 ${a.name} · ${reward}`);
     this.updateMoney();
+  }
+
+  // ---- Collection / Drone Index --------------------------------------------
+  openCollection() { this.renderCollection(); $('#collectionModal').classList.add('open'); }
+
+  renderCollection() {
+    const g = this.game;
+    const { done, total } = g.dexCount();
+    const sets = g.completedSetCount();
+    const bonus = Math.round((g.collectionMult() - 1) * 100);
+    $('#colCount').textContent = `${done}/${total}`;
+    $('#colBonus').innerHTML = `Собрано наборов: <b>${sets}</b> · бонус к доходу <b style="color:#4ade80">+${bonus}%</b>`;
+
+    const wrap = $('#colList');
+    wrap.innerHTML = '';
+    for (const rid of RARITY_ORDER) {
+      const rar = RARITIES[rid];
+      const pool = DRONES_BY_RARITY[rid] || [];
+      if (!pool.length) continue;
+      const owned = pool.filter(d => g.state.dex?.[d.id]).length;
+      const complete = owned === pool.length;
+
+      const section = document.createElement('div');
+      section.className = 'col-section';
+      const head = document.createElement('div');
+      head.className = 'col-head';
+      const setReward = COLLECTION.setGems[rid] || 0;
+      head.innerHTML = `
+        <span class="col-rar" style="color:${rar.color}">${rar.name}</span>
+        <span class="col-frac">${owned}/${pool.length}${complete ? ' ✓' : ` · +${setReward}◆`}</span>`;
+      section.appendChild(head);
+
+      const grid = document.createElement('div');
+      grid.className = 'col-grid';
+      for (const d of pool) {
+        const found = !!g.state.dex?.[d.id];
+        const cell = document.createElement('div');
+        cell.className = 'col-cell' + (found ? '' : ' locked');
+        cell.style.setProperty('--rar', rar.color);
+        if (found) {
+          const cv = document.createElement('canvas');
+          cv.className = 'cc-canvas'; cv.style.width = '48px'; cv.style.height = '48px';
+          cell.appendChild(cv);
+          const nm = document.createElement('div');
+          nm.className = 'cc-name'; nm.textContent = d.name;
+          cell.appendChild(nm);
+          requestAnimationFrame(() => drawDroneIcon(cv, d.id));
+        } else {
+          cell.innerHTML = `<div class="cc-lock">?</div><div class="cc-name">???</div>`;
+        }
+        grid.appendChild(cell);
+      }
+      section.appendChild(grid);
+      wrap.appendChild(section);
+    }
+  }
+
+  // Called when a new drone is discovered (may complete a rarity set).
+  onDex(payload) {
+    const events = payload?.events || [];
+    for (const ev of events) {
+      if (ev.type === 'set') {
+        const rar = RARITIES[ev.rarity];
+        audio.achievement();
+        this.toast(`📖 Набор «${rar.name}» собран! +${ev.gems} ◆`);
+      } else if (ev.type === 'full') {
+        audio.achievement();
+        this.toast(`🏅 Полный индекс дронов! +${ev.gems} ◆`);
+      }
+    }
+    this.updateMoney();
+    if ($('#collectionModal').classList.contains('open')) this.renderCollection();
   }
 
   // ---- Daily ---------------------------------------------------------------
