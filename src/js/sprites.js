@@ -1,8 +1,9 @@
 // ============================================================================
 //  Static sprite drawing for UI thumbnails (drones, planets).
 // ============================================================================
-import { DRONE_BY_ID, RARITIES, PLANETS, ORES } from './config.js';
-import { roundRect, hexA, drawDroneChassis, drawDrill } from './render.js';
+import { DRONE_BY_ID, RARITIES, PLANETS, ORES, PLANET_ART } from './config.js';
+import { roundRect, hexA, drawDroneChassis, drawDrill, drawDroneArt } from './render.js';
+import { getArt } from './assets.js';
 
 // Draw a drone icon into a canvas element, upright, with a neon rarity ring.
 export function drawDroneIcon(canvas, droneId, star = 0) {
@@ -34,14 +35,16 @@ export function drawDroneIcon(canvas, droneId, star = 0) {
   ctx.beginPath(); ctx.arc(cx, cy, size * 0.35, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
 
-  // Drone chassis + static drill.
+  // Custom sprite if present, else procedural chassis + static drill.
   ctx.save();
   ctx.translate(cx, cy);
-  drawDroneChassis(ctx, drone, rar, R, { animated: false });
-  ctx.save();
-  ctx.translate(0, R * 0.62 + R * 0.1);
-  drawDrill(ctx, drone.shape, R, 0.5, rar, false);
-  ctx.restore();
+  if (!drawDroneArt(ctx, drone, R)) {
+    drawDroneChassis(ctx, drone, rar, R, { animated: false });
+    ctx.save();
+    ctx.translate(0, R * 0.62 + R * 0.1);
+    drawDrill(ctx, drone.shape, R, 0.5, rar, false);
+    ctx.restore();
+  }
   ctx.restore();
 
   if (star > 0) drawStarRow(ctx, cx, size * 0.95, star, size * 0.075);
@@ -99,6 +102,19 @@ export function drawPlanetIcon(canvas, tier) {
   // body
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+  // Custom static planet art overrides the procedural disc when present.
+  const pArt = PLANET_ART[tier] && getArt(PLANET_ART[tier]);
+  if (pArt && pArt.ready && pArt.img.width) {
+    ctx.drawImage(pArt.img, cx - R, cy - R, R * 2, R * 2);
+    const shd = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, R * 0.1, cx, cy, R * 1.05);
+    shd.addColorStop(0, 'rgba(255,255,255,0.18)'); shd.addColorStop(0.55, 'rgba(255,255,255,0)');
+    shd.addColorStop(0.85, 'rgba(0,0,0,0.15)'); shd.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = shd; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+    ctx.restore();
+    ctx.strokeStyle = hexA(p.atmos, 0.5); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    return;
+  }
   ctx.fillStyle = p.core; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
   // land blobs
   const rnd = mulberry32(tier * 131 + 7);

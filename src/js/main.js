@@ -8,7 +8,8 @@ import { WorldRenderer } from './render.js';
 import { Particles } from './particles.js';
 import { UI } from './ui.js';
 import { audio } from './audio.js';
-import { RARITIES, formatShort, EVENT_BY_ID } from './config.js';
+import { RARITIES, formatShort, EVENT_BY_ID, DRONE_ART, PLANET_ART } from './config.js';
+import { preloadArt } from './assets.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -170,6 +171,7 @@ window.addEventListener('pagehide', save);
 // --- Boot -------------------------------------------------------------------
 async function boot() {
   await platform.init();
+  preloadArt([...Object.values(DRONE_ART), ...Object.values(PLANET_ART)]);
 
   let saved = null;
   try { saved = await platform.load(); } catch (e) {}

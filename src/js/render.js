@@ -1,7 +1,8 @@
 // ============================================================================
 //  World renderer: planet (baked, rotating), dock ring, animated mining drones.
 // ============================================================================
-import { PLANETS, DRONE_BY_ID, RARITIES, ORES, ORE_BY_ID } from './config.js';
+import { PLANETS, DRONE_BY_ID, RARITIES, ORES, ORE_BY_ID, DRONE_ART, PLANET_ART } from './config.js';
+import { getArt } from './assets.js';
 
 // Deterministic pseudo-random for stable planet features per tier.
 function mulberry32(a) {
@@ -161,7 +162,11 @@ export class WorldRenderer {
     ctx.arc(cx, cy, R, 0, Math.PI * 2);
     ctx.clip();
 
-    if (this.surface) {
+    const artPath = PLANET_ART[this.tier];
+    const art = artPath && getArt(artPath);
+    if (art && art.ready && art.img.width) {
+      ctx.drawImage(art.img, cx - R, cy - R, R * 2, R * 2);   // custom static art
+    } else if (this.surface) {
       const destH = R * 2;
       const scale = destH / this.surfH;
       const destW = this.surfW * scale;
@@ -315,6 +320,8 @@ export class WorldRenderer {
 
   // Drone drawn facing "down" (+y) toward planet; drill tip at bottom.
   _drawDrone(ctx, drone, rar, R, t, progress) {
+    // Custom sprite override (Claude-designed / hand-made art).
+    if (drawDroneArt(ctx, drone, R)) return;
     const spin = t * 10;
     drawDroneChassis(ctx, drone, rar, R, { spin, thrust: t, animated: true });
     // Drill assembly at bottom, animated by shape.
@@ -482,6 +489,33 @@ export function drawDrill(ctx, shape, R, spin, rar, animated = true) {
     ctx.restore();
   }
   ctx.restore();
+}
+
+// Draws a custom drone sprite (if one exists and is loaded) centred at the
+// origin, facing +y. Returns true when it drew, false to fall back to
+// procedural art. `R` is the procedural body-unit so art scales to match.
+export function drawDroneArt(ctx, drone, R) {
+  const path = DRONE_ART[drone.id];
+  if (!path) return false;
+  const art = getArt(path);
+  if (!art || !art.ready || !art.img.width) return false;
+  const h = R * 3.0;
+  const w = h * (art.img.width / art.img.height);
+  ctx.drawImage(art.img, -w / 2, -R * 0.95, w, h);
+  return true;
+}
+
+// Draws a custom planet sprite clipped to the disc. Returns true when drawn.
+export function drawPlanetArt(ctx, tier, cx, cy, R) {
+  const path = PLANET_ART[tier];
+  if (!path) return false;
+  const art = getArt(path);
+  if (!art || !art.ready || !art.img.width) return false;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+  ctx.drawImage(art.img, cx - R, cy - R, R * 2, R * 2);
+  ctx.restore();
+  return true;
 }
 
 // --- helpers ---------------------------------------------------------------

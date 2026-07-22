@@ -89,6 +89,11 @@ await page.screenshot({ path: 'tools/shot_12_hangar.png' });
 await page.click('#hangarModal .close');
 await page.waitForTimeout(200);
 
+// Deploy the celestial drone (custom SVG sprite) to the planet ring.
+await page.evaluate(() => { const g = window.__game; g.deployDrones('celestia', 0, 1); window.ui.updateInventory(); });
+await page.waitForTimeout(800);
+await page.screenshot({ path: 'tools/shot_13_customart.png' });
+
 // Multi-reel roulette (rolls upgrade -> multiple reels)
 await page.evaluate(() => { const g = window.__game; g.state.upgrades.rolls = 3; window.ui.updateRailCosts(); });
 await page.click('#btnRoulette');

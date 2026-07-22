@@ -96,6 +96,24 @@ export const DRONES = [
   { id: 'celestia', name: 'Селестия',     rarity: 'celestial', power: 12000,interval: 0.5, shape: 'quad' },
 ];
 
+// --- Custom art (optional) --------------------------------------------------
+// Drop a PNG or SVG sprite in here to override a drone's procedural look.
+//   key   = drone id (see DRONES above)
+//   value = path relative to index.html
+// The sprite must face DOWN (head up, drill toward the bottom), be roughly
+// square-ish with a transparent background, ~256px. Missing/failed files fall
+// back to the procedural drone automatically. See src/assets/README.md.
+export const DRONE_ART = {
+  // Example hero sprite — swap in your own Claude-designed art (see README).
+  celestia: 'assets/drones/celestia.svg',
+};
+
+// Optional static planet art per tier (0-based index into PLANETS). A static
+// image replaces the procedural planet disc (rotation is lost). ~512px, square.
+export const PLANET_ART = {
+  // 9: 'assets/planets/void.png',
+};
+
 export const ORE_BY_ID = Object.fromEntries(ORES.map(o => [o.id, o]));
 export const DRONE_BY_ID = Object.fromEntries(DRONES.map(d => [d.id, d]));
 export const DRONES_BY_RARITY = RARITY_ORDER.reduce((acc, r) => {
