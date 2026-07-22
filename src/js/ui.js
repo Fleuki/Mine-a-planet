@@ -33,6 +33,8 @@ export class UI {
     this.spinning = false;
     this._achQueue = [];
     this._lastOffline = null;
+    this._hangarSort = 'rarity';
+    this._hangarFilter = 'all';
     this._bind();
     this._applySettings();
     this.refreshAll();
@@ -52,6 +54,7 @@ export class UI {
     $('#btnDaily').onclick = () => { audio.click(); this.openDaily(); };
     $('#btnAch').onclick = () => { audio.click(); this.openAchievements(); };
     $('#btnCollection').onclick = () => { audio.click(); this.openCollection(); };
+    $('#btnHangar').onclick = () => { audio.click(); this.openHangar(); };
     $('#btnBoost').onclick = () => { audio.click(); this.openBoost(); };
     $('#btnSound').onclick = () => this.toggleSound();
     $('#claimDaily').onclick = () => this.doClaimDaily();
@@ -201,7 +204,16 @@ export class UI {
       strip.appendChild(empty);
       return;
     }
-    for (const item of inv) {
+    // Show strongest / rarest first so the useful drones are reachable.
+    const sorted = [...inv].sort((a, b) => {
+      const da = DRONE_BY_ID[a.droneId], db = DRONE_BY_ID[b.droneId];
+      const oa = RARITIES[da.rarity].order, ob = RARITIES[db.rarity].order;
+      if (ob !== oa) return ob - oa;
+      const pa = da.power * droneStarMult(a.star || 0) / da.interval;
+      const pb = db.power * droneStarMult(b.star || 0) / db.interval;
+      return pb - pa;
+    });
+    for (const item of sorted) {
       const drone = DRONE_BY_ID[item.droneId];
       const rar = RARITIES[drone.rarity];
       const card = document.createElement('div');
@@ -888,6 +900,129 @@ export class UI {
     }
     this.updateMoney();
     if ($('#collectionModal').classList.contains('open')) this.renderCollection();
+  }
+
+  // ---- Hangar management (sort / filter / bulk scrap) ----------------------
+  openHangar() { this.renderHangar(); $('#hangarModal').classList.add('open'); }
+
+  renderHangar() {
+    const g = this.game;
+    const inv = g.state.inventory;
+    $('#hangarCount').textContent = `${inv.length}`;
+
+    // Sort selector
+    const sorts = [['rarity', 'Редкость'], ['power', 'Сила'], ['count', 'Кол-во']];
+    const sortBox = $('#hangarSort');
+    sortBox.innerHTML = '';
+    for (const [id, label] of sorts) {
+      const b = document.createElement('button');
+      b.className = 'hg-chip' + (this._hangarSort === id ? ' active' : '');
+      b.textContent = label;
+      b.onclick = () => { this._hangarSort = id; audio.click(); this.renderHangar(); };
+      sortBox.appendChild(b);
+    }
+
+    // Rarity filter (only rarities present, plus "Все")
+    const present = g.inventoryRarities();
+    if (this._hangarFilter !== 'all' && !present.includes(this._hangarFilter)) this._hangarFilter = 'all';
+    const filterBox = $('#hangarFilter');
+    filterBox.innerHTML = '';
+    const allChip = document.createElement('button');
+    allChip.className = 'hg-chip' + (this._hangarFilter === 'all' ? ' active' : '');
+    allChip.textContent = 'Все';
+    allChip.onclick = () => { this._hangarFilter = 'all'; audio.click(); this.renderHangar(); };
+    filterBox.appendChild(allChip);
+    for (const rid of present) {
+      const b = document.createElement('button');
+      b.className = 'hg-chip' + (this._hangarFilter === rid ? ' active' : '');
+      b.textContent = RARITIES[rid].name;
+      b.style.color = RARITIES[rid].color;
+      b.onclick = () => { this._hangarFilter = rid; audio.click(); this.renderHangar(); };
+      filterBox.appendChild(b);
+    }
+
+    // Bulk-scrap-below buttons (one per rarity above common that has drones below it)
+    const scrapBox = $('#hangarScrapBtns');
+    scrapBox.innerHTML = '';
+    const orders = present.map(r => RARITIES[r].order);
+    const minOrder = orders.length ? Math.min(...orders) : 0;
+    const maxOrder = orders.length ? Math.max(...orders) : 0;
+    let anyScrap = false;
+    for (let o = minOrder + 1; o <= maxOrder; o++) {
+      const rid = RARITY_ORDER[o];
+      const belowCount = inv.filter(it => RARITIES[DRONE_BY_ID[it.droneId].rarity].order < o).length;
+      if (belowCount <= 0) continue;
+      anyScrap = true;
+      const b = document.createElement('button');
+      b.className = 'hg-scrap-btn';
+      b.style.borderColor = hexA(RARITIES[rid].color, 0.6);
+      b.innerHTML = `< ${RARITIES[rid].name} <span class="hg-scrap-n">${belowCount}</span>`;
+      b.onclick = () => {
+        const res = g.scrapBelowRarity(o);
+        if (res.count > 0) {
+          audio.sell();
+          this.toast(`Разобрано ${res.count} · +${money(res.money)}`);
+          this.updateMoney(); this.updateInventory(); this.renderHangar();
+        } else audio.error();
+      };
+      scrapBox.appendChild(b);
+    }
+    if (!anyScrap) {
+      const note = document.createElement('span');
+      note.className = 'hg-scrap-none';
+      note.textContent = 'нет дронов для массовой разборки';
+      scrapBox.appendChild(note);
+    }
+
+    // Grid of grouped drones
+    const grid = $('#hangarGrid');
+    grid.innerHTML = '';
+    const groups = g.inventoryGroups(this._hangarSort, this._hangarFilter);
+    if (groups.length === 0) {
+      const e = document.createElement('div');
+      e.className = 'fuse-empty';
+      e.textContent = 'Ангар пуст. Крути рулетку, чтобы получить дронов.';
+      grid.appendChild(e);
+    }
+    const freeSlots = g.state.slots.filter(s => !s.droneId).length;
+    for (const grp of groups) {
+      const drone = DRONE_BY_ID[grp.droneId];
+      const rar = RARITIES[drone.rarity];
+      const dps = (drone.power * droneStarMult(grp.star) / drone.interval * g.miningSpeedMult).toFixed(1);
+      const scrapEach = Math.floor(g.droneScrapValue(drone, grp.star));
+      const card = document.createElement('div');
+      card.className = 'hg-card';
+      card.style.setProperty('--rar', rar.color);
+      card.innerHTML = `
+        <canvas class="hg-canvas" style="width:52px;height:52px"></canvas>
+        <div class="hg-info">
+          <div class="hg-name">${drone.name} ${grp.star > 0 ? `<span style="color:#ffd54a">${starStr(grp.star)}</span>` : ''}</div>
+          <div class="hg-rar" style="color:${rar.color}">${rar.name} · ${dps}/с · ×${grp.count}</div>
+        </div>
+        <div class="hg-actions">
+          <button class="hg-place">Ставить</button>
+          <button class="hg-scrap1">Разобрать<br>+${money(scrapEach)}</button>
+        </div>`;
+      const cv = card.querySelector('.hg-canvas');
+      requestAnimationFrame(() => drawDroneIcon(cv, drone.id, grp.star));
+      const placeBtn = card.querySelector('.hg-place');
+      placeBtn.disabled = freeSlots <= 0;
+      placeBtn.onclick = () => {
+        const n = g.deployDrones(grp.droneId, grp.star, g.deployCount);
+        if (n <= 0) { audio.error(); return; }
+        audio.upgrade();
+        this.toast(n > 1 ? `${drone.name} ×${n} на посту!` : `${drone.name} на посту!`);
+        this.updateInventory(); this.renderHangar(); this.game.evaluateAchievements();
+      };
+      card.querySelector('.hg-scrap1').onclick = () => {
+        const res = g.scrapGroup(grp.droneId, grp.star);
+        if (res.count <= 0) { audio.error(); return; }
+        audio.sell();
+        this.toast(`Разобрано ${res.count} · +${money(res.money)}`);
+        this.updateMoney(); this.updateInventory(); this.renderHangar();
+      };
+      grid.appendChild(card);
+    }
   }
 
   // ---- Daily ---------------------------------------------------------------

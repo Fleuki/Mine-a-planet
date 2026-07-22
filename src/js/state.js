@@ -359,6 +359,81 @@ export class Game {
     return this.state.inventory.reduce((n, d) => n + (d.droneId === droneId && (d.star || 0) === star ? 1 : 0), 0);
   }
 
+  // Group hangar drones by id+star. `sort` is 'rarity' | 'power' | 'count'.
+  inventoryGroups(sort = 'rarity', filterRarity = 'all') {
+    const map = new Map();
+    for (const it of this.state.inventory) {
+      const star = it.star || 0;
+      const key = it.droneId + ':' + star;
+      if (!map.has(key)) map.set(key, { droneId: it.droneId, star, count: 0 });
+      map.get(key).count++;
+    }
+    let groups = [...map.values()];
+    if (filterRarity !== 'all') {
+      groups = groups.filter(g => DRONE_BY_ID[g.droneId]?.rarity === filterRarity);
+    }
+    const power = (g) => {
+      const d = DRONE_BY_ID[g.droneId];
+      return d.power * droneStarMult(g.star) / d.interval;
+    };
+    groups.sort((a, b) => {
+      const da = DRONE_BY_ID[a.droneId], db = DRONE_BY_ID[b.droneId];
+      if (sort === 'count') return b.count - a.count || power(b) - power(a);
+      if (sort === 'power') return power(b) - power(a);
+      // rarity (default): rarer first, then stronger, then more stars
+      const oa = RARITIES[da.rarity].order, ob = RARITIES[db.rarity].order;
+      return ob - oa || power(b) - power(a) || b.star - a.star;
+    });
+    return groups;
+  }
+
+  // Which rarities are currently present in the hangar.
+  inventoryRarities() {
+    const present = new Set();
+    for (const it of this.state.inventory) {
+      const d = DRONE_BY_ID[it.droneId];
+      if (d) present.add(d.rarity);
+    }
+    return RARITY_ORDER.filter(r => present.has(r));
+  }
+
+  // Bulk-scrap every hangar drone whose rarity order is strictly below `order`.
+  // Returns { count, money }. Placed drones are never touched.
+  scrapBelowRarity(order) {
+    let money = 0, count = 0;
+    for (let i = this.state.inventory.length - 1; i >= 0; i--) {
+      const it = this.state.inventory[i];
+      const d = DRONE_BY_ID[it.droneId];
+      if (!d) continue;
+      if (RARITIES[d.rarity].order < order) {
+        money += Math.floor(this.droneScrapValue(d, it.star || 0));
+        this.state.inventory.splice(i, 1);
+        count++;
+      }
+    }
+    if (money) { this.state.money += money; emit('money', this.state.money); }
+    if (count) emit('slots');
+    return { count, money };
+  }
+
+  // Scrap every copy of one drone+star group in the hangar. Returns {count, money}.
+  scrapGroup(droneId, star = 0) {
+    star = star || 0;
+    const d = DRONE_BY_ID[droneId];
+    let money = 0, count = 0;
+    for (let i = this.state.inventory.length - 1; i >= 0; i--) {
+      const it = this.state.inventory[i];
+      if (it.droneId === droneId && (it.star || 0) === star) {
+        money += Math.floor(this.droneScrapValue(d, star));
+        this.state.inventory.splice(i, 1);
+        count++;
+      }
+    }
+    if (money) { this.state.money += money; emit('money', this.state.money); }
+    if (count) emit('slots');
+    return { count, money };
+  }
+
   // Batch-place up to `maxCount` copies of a drone (droneId + star) from the
   // hangar into free docks. If `firstSlotIndex` is given, that dock is filled
   // first (used when the player tapped a specific empty dock). Returns the

@@ -110,7 +110,10 @@
 
     <!-- Bottom: drone inventory hotbar -->
     <div class="hotbar" id="hotbar">
-      <div class="hotbar-title">Ангар дронов</div>
+      <button class="hotbar-head" id="btnHangar">
+        <span class="hotbar-title">Ангар дронов</span>
+        <span class="hotbar-manage">Управление&nbsp;⚙</span>
+      </button>
       <div class="hotbar-slots" id="inventoryStrip"></div>
     </div>
   </div>
@@ -181,6 +184,23 @@
       <h2>Индекс дронов <span class="ach-count" id="colCount"></span></h2>
       <div class="col-bonus" id="colBonus"></div>
       <div class="col-list" id="colList"></div>
+    </div>
+  </div>
+
+  <!-- ===== Hangar management modal ===== -->
+  <div class="overlay" id="hangarModal">
+    <div class="modal hangar-modal">
+      <button class="close" data-close></button>
+      <h2>Ангар дронов <span class="ach-count" id="hangarCount"></span></h2>
+      <div class="hangar-tools">
+        <div class="hg-row"><span class="hg-lbl">Сортировка</span><div class="hg-sort" id="hangarSort"></div></div>
+        <div class="hg-row"><span class="hg-lbl">Фильтр</span><div class="hg-filter" id="hangarFilter"></div></div>
+      </div>
+      <div class="hangar-scrap">
+        <span class="hg-lbl">Разобрать всё ниже редкости:</span>
+        <div class="hg-scrap-btns" id="hangarScrapBtns"></div>
+      </div>
+      <div class="hangar-grid" id="hangarGrid"></div>
     </div>
   </div>
 

@@ -119,7 +119,9 @@ html, body {
   border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 8px 12px 10px;
   box-shadow: var(--shadow);
 }
-.hotbar-title { font-size: 11px; font-weight: 800; letter-spacing: .5px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+.hotbar-head { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: none; border: none; cursor: pointer; padding: 0; margin-bottom: 6px; }
+.hotbar-title { font-size: 11px; font-weight: 800; letter-spacing: .5px; color: var(--text-dim); text-transform: uppercase; text-align: center; }
+.hotbar-manage { font-size: 10px; font-weight: 800; color: var(--blue); background: rgba(56,189,248,.14); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .hotbar-slots { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
 .hotbar-slots::-webkit-scrollbar { height: 5px; }
 .hotbar-slots::-webkit-scrollbar-thumb { background: rgba(150,170,230,.35); border-radius: 999px; }
@@ -450,6 +452,44 @@ html, body {
 .cc-lock { width: 48px; height: 48px; display: grid; place-items: center; font-size: 24px; font-weight: 800; color: var(--text-dim); }
 .cc-name { font-size: 9.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .col-cell.locked .cc-name { color: var(--text-dim); }
+
+/* ===== Hangar management ===== */
+.hangar-tools { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.hg-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hg-lbl { font-size: 11px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: .3px; }
+.hg-sort, .hg-filter, .hg-scrap-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.hg-chip {
+  border: 1px solid var(--panel-border); background: rgba(255,255,255,.05); color: var(--text);
+  font-family: var(--font); font-weight: 800; font-size: 12px; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+}
+.hg-chip.active { background: linear-gradient(180deg, var(--blue), #2f80d0); color: #04263f; border-color: transparent; }
+.hangar-scrap {
+  background: rgba(0,0,0,.2); border: 1px solid var(--panel-border); border-radius: 14px;
+  padding: 10px 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.hg-scrap-btn {
+  border: 1px solid var(--panel-border); background: rgba(0,0,0,.25); color: var(--text);
+  font-family: var(--font); font-weight: 800; font-size: 12px; padding: 6px 12px; border-radius: 10px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+}
+.hg-scrap-btn:active { transform: translateY(1px); }
+.hg-scrap-n { background: rgba(255,255,255,.12); border-radius: 999px; padding: 0 7px; font-size: 11px; }
+.hg-scrap-none { font-size: 12px; color: var(--text-dim); font-weight: 700; }
+.hangar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 10px; max-height: 46vh; overflow-y: auto; padding: 2px; }
+.hg-card {
+  display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 13px; min-width: 0;
+  background: rgba(0,0,0,.22); border: 1px solid var(--panel-border); border-left: 4px solid var(--rar);
+}
+.hg-canvas { flex: 0 0 52px; }
+.hg-info { flex: 1; min-width: 0; }
+.hg-name { font-weight: 800; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hg-rar { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hg-actions { display: flex; flex-direction: column; gap: 5px; flex: 0 0 auto; }
+.hg-actions button { border: none; cursor: pointer; font-family: var(--font); font-weight: 800; font-size: 11px; padding: 6px 9px; border-radius: 9px; line-height: 1.05; }
+.hg-place { background: linear-gradient(180deg, var(--green), var(--green-2)); color: #06210f; }
+.hg-place:disabled { filter: grayscale(.7) brightness(.6); cursor: default; }
+.hg-scrap1 { background: linear-gradient(180deg, #ff7a7a, var(--danger)); color: #2a0606; }
+.hg-actions button:active { transform: translateY(1px); }
 
 /* ===== Responsive: portrait / small ===== */
 @media (max-width: 620px) {

@@ -82,6 +82,13 @@ await page.screenshot({ path: 'tools/shot_8_picker.png' });
 await page.evaluate(() => document.querySelector('#pickModal').classList.remove('open'));
 await page.waitForTimeout(200);
 
+// Hangar management (sort / filter / bulk scrap)
+await page.click('#btnHangar');
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'tools/shot_12_hangar.png' });
+await page.click('#hangarModal .close');
+await page.waitForTimeout(200);
+
 // Multi-reel roulette (rolls upgrade -> multiple reels)
 await page.evaluate(() => { const g = window.__game; g.state.upgrades.rolls = 3; window.ui.updateRailCosts(); });
 await page.click('#btnRoulette');
