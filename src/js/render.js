@@ -315,119 +315,173 @@ export class WorldRenderer {
 
   // Drone drawn facing "down" (+y) toward planet; drill tip at bottom.
   _drawDrone(ctx, drone, rar, R, t, progress) {
-    const bodyW = R * 1.1, bodyH = R * 1.2;
     const spin = t * 10;
-
-    // Body — rounded metallic capsule with rarity trim.
+    drawDroneChassis(ctx, drone, rar, R, { spin, thrust: t, animated: true });
+    // Drill assembly at bottom, animated by shape.
     ctx.save();
-    // shadow
-    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
-    roundRect(ctx, -bodyW / 2, -bodyH / 2, bodyW, bodyH, R * 0.35);
-    const bodyGrad = ctx.createLinearGradient(0, -bodyH / 2, 0, bodyH / 2);
-    bodyGrad.addColorStop(0, '#eef3fb');
-    bodyGrad.addColorStop(0.5, '#c2cede');
-    bodyGrad.addColorStop(1, '#8b98ac');
-    ctx.fillStyle = bodyGrad;
-    ctx.fill();
-    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.translate(0, R * 0.62 + R * 0.1);
+    this._drawDrill(ctx, drone.shape, R, spin, rar, true);
+    ctx.restore();
+  }
 
-    // Trim ring / cockpit glow by rarity.
-    ctx.fillStyle = hexA(rar.color, 0.95);
-    roundRect(ctx, -bodyW / 2, -bodyH / 2, bodyW, R * 0.32, R * 0.16);
-    ctx.fill();
-    // cockpit
-    const eye = ctx.createRadialGradient(0, -R * 0.15, 0, 0, -R * 0.15, R * 0.42);
-    eye.addColorStop(0, rar.glow);
-    eye.addColorStop(0.6, rar.color);
-    eye.addColorStop(1, hexA(rar.color, 0.2));
-    ctx.fillStyle = eye;
-    ctx.beginPath(); ctx.arc(0, -R * 0.12, R * 0.34, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath(); ctx.arc(-R * 0.1, -R * 0.24, R * 0.09, 0, Math.PI * 2); ctx.fill();
+  _drawDrill(ctx, shape, R, spin, rar, animated) {
+    drawDrill(ctx, shape, R, spin, rar, animated);
+  }
+}
 
-    // Side thruster fins.
-    ctx.fillStyle = '#8f9db2';
-    roundRect(ctx, -bodyW / 2 - R * 0.18, -R * 0.05, R * 0.2, R * 0.5, R * 0.08); ctx.fill();
-    roundRect(ctx, bodyW / 2 - R * 0.02, -R * 0.05, R * 0.2, R * 0.5, R * 0.08); ctx.fill();
-    // thruster flames
+// ============================================================================
+//  Shared drone drawing — used by the world renderer and the UI sprite icons
+//  so both stay in visual sync. Drone faces "down" (+y): head up, drill below.
+// ============================================================================
+// Draws the head/chassis centred at the origin. Options:
+//   spin      - drill/animation phase
+//   thrust    - time for thruster flicker
+//   animated  - whether to draw animated thruster flames
+export function drawDroneChassis(ctx, drone, rar, R, opts = {}) {
+  const { thrust = 0, animated = false } = opts;
+  const bodyW = R * 1.28, bodyH = R * 1.02;
+
+  ctx.save();
+
+  // Side pods ("ears") with rarity light — sit behind the head.
+  ctx.fillStyle = '#aeb8c9';
+  roundRect(ctx, -bodyW / 2 - R * 0.14, -R * 0.32, R * 0.32, R * 0.66, R * 0.15); ctx.fill();
+  roundRect(ctx,  bodyW / 2 - R * 0.18, -R * 0.32, R * 0.32, R * 0.66, R * 0.15); ctx.fill();
+  ctx.fillStyle = rar.glow;
+  ctx.shadowColor = rar.color; ctx.shadowBlur = 6;
+  ctx.beginPath(); ctx.arc(-bodyW / 2 - R * 0.14 + R * 0.16, 0, R * 0.07, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc( bodyW / 2 - R * 0.18 + R * 0.16, 0, R * 0.07, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Animated downward thrusters from the pods (keeps the world lively).
+  if (animated) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const fl = 0.5 + 0.5 * Math.abs(Math.sin(t * 20));
-    for (const fx of [-bodyW / 2 - R * 0.08, bodyW / 2 + R * 0.08]) {
-      const fg = ctx.createRadialGradient(fx, R * 0.5, 0, fx, R * 0.5, R * 0.3 * fl);
-      fg.addColorStop(0, 'rgba(140,210,255,0.9)');
-      fg.addColorStop(1, 'rgba(140,210,255,0)');
+    const fl = 0.5 + 0.5 * Math.abs(Math.sin(thrust * 20));
+    for (const fx of [-bodyW / 2 - R * 0.0, bodyW / 2 + R * 0.0]) {
+      const fg = ctx.createRadialGradient(fx, R * 0.42, 0, fx, R * 0.42, R * 0.26 * fl);
+      fg.addColorStop(0, 'rgba(150,215,255,0.85)');
+      fg.addColorStop(1, 'rgba(150,215,255,0)');
       ctx.fillStyle = fg;
-      ctx.beginPath(); ctx.arc(fx, R * 0.5, R * 0.3 * fl, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(fx, R * 0.42, R * 0.26 * fl, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.restore();
-
-    // Drill assembly at bottom, animated by shape.
-    ctx.translate(0, bodyH / 2 - R * 0.05);
-    this._drawDrill(ctx, drone.shape, R, spin, rar);
     ctx.restore();
   }
 
-  _drawDrill(ctx, shape, R, spin, rar) {
+  // Head — rounded metallic body.
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+  roundRect(ctx, -bodyW / 2, -bodyH / 2, bodyW, bodyH, R * 0.34);
+  const bodyGrad = ctx.createLinearGradient(0, -bodyH / 2, 0, bodyH / 2);
+  bodyGrad.addColorStop(0, '#f4f8ff');
+  bodyGrad.addColorStop(0.5, '#ccd7e7');
+  bodyGrad.addColorStop(1, '#96a4ba');
+  ctx.fillStyle = bodyGrad; ctx.fill();
+  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  // Top dome highlight.
+  ctx.fillStyle = 'rgba(255,255,255,0.32)';
+  roundRect(ctx, -bodyW * 0.32, -bodyH / 2 + R * 0.05, bodyW * 0.64, R * 0.15, R * 0.08); ctx.fill();
+
+  // Dark visor with two glowing rarity eyes.
+  const visorY = -R * 0.03;
+  ctx.fillStyle = 'rgba(18,15,32,0.94)';
+  roundRect(ctx, -bodyW * 0.42, visorY - R * 0.24, bodyW * 0.84, R * 0.5, R * 0.2); ctx.fill();
+  for (const ex of [-R * 0.27, R * 0.27]) {
+    const eg = ctx.createRadialGradient(ex - R * 0.03, visorY - R * 0.03, 0, ex, visorY, R * 0.19);
+    eg.addColorStop(0, '#ffffff');
+    eg.addColorStop(0.35, rar.glow);
+    eg.addColorStop(1, hexA(rar.color, 0.25));
+    ctx.fillStyle = eg;
+    ctx.beginPath(); ctx.ellipse(ex, visorY, R * 0.13, R * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Rarity trim strip along the jaw.
+  ctx.fillStyle = hexA(rar.color, 0.95);
+  roundRect(ctx, -bodyW / 2, bodyH / 2 - R * 0.13, bodyW, R * 0.13, R * 0.07); ctx.fill();
+
+  // Neck connector down to the drill.
+  ctx.fillStyle = '#8f9db2';
+  roundRect(ctx, -R * 0.2, bodyH / 2 - R * 0.04, R * 0.4, R * 0.2, R * 0.06); ctx.fill();
+
+  ctx.restore();
+}
+
+// Draws a drill of the given shape, tip pointing +y, top at the origin.
+export function drawDrill(ctx, shape, R, spin, rar, animated = true) {
+  ctx.save();
+  if (shape === 'laser') {
+    ctx.fillStyle = '#5a6577';
+    roundRect(ctx, -R * 0.18, 0, R * 0.36, R * 0.42, R * 0.09); ctx.fill();
+    const glow = ctx.createRadialGradient(0, R * 0.5, 0, 0, R * 0.5, R * 0.2);
+    glow.addColorStop(0, '#ffffff');
+    glow.addColorStop(0.4, rar.glow);
+    glow.addColorStop(1, hexA(rar.color, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0, R * 0.5, R * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = rar.glow;
+    ctx.beginPath(); ctx.arc(0, R * 0.5, R * 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore(); return;
+  }
+  if (shape === 'saw') {
+    ctx.translate(0, R * 0.44);
+    if (animated) ctx.rotate(spin);
+    ctx.fillStyle = '#cbd5e3';
+    const teeth = 10, rr = R * 0.44;
+    ctx.beginPath();
+    for (let i = 0; i < teeth * 2; i++) {
+      const a = (i / (teeth * 2)) * Math.PI * 2;
+      const rad = i % 2 === 0 ? rr : rr * 0.68;
+      ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = hexA(rar.color, 0.85);
+    ctx.beginPath(); ctx.arc(0, 0, rr * 0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8f9db2';
+    ctx.beginPath(); ctx.arc(0, 0, rr * 0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore(); return;
+  }
+  // auger / drill / twin / quad — tapered striped cones with a bright tip.
+  const bits = shape === 'twin' ? 2 : shape === 'quad' ? 3 : 1;
+  const spread = R * (bits > 1 ? 0.3 : 0);
+  const len = bits > 1 ? R * 0.66 : R * 0.9;
+  const wid = bits > 1 ? R * 0.17 : R * 0.25;
+  for (let b = 0; b < bits; b++) {
+    const bx = bits === 1 ? 0 : -spread + (b / (bits - 1)) * spread * 2;
     ctx.save();
-    if (shape === 'laser') {
-      // Emitter nozzle.
-      ctx.fillStyle = '#5a6577';
-      roundRect(ctx, -R * 0.16, 0, R * 0.32, R * 0.4, R * 0.08); ctx.fill();
-      ctx.fillStyle = rar.glow;
-      ctx.beginPath(); ctx.arc(0, R * 0.42, R * 0.12, 0, Math.PI * 2); ctx.fill();
-      ctx.restore(); return;
-    }
-    if (shape === 'saw') {
-      ctx.translate(0, R * 0.4);
-      ctx.rotate(spin);
-      ctx.fillStyle = '#c8d2e0';
-      const teeth = 10, rr = R * 0.42;
+    ctx.translate(bx, 0);
+    // collar
+    ctx.fillStyle = '#9aa7ba';
+    roundRect(ctx, -wid * 1.1, -R * 0.02, wid * 2.2, R * 0.14, R * 0.05); ctx.fill();
+    // cone
+    ctx.beginPath();
+    ctx.moveTo(-wid, R * 0.1); ctx.lineTo(wid, R * 0.1); ctx.lineTo(0, R * 0.1 + len); ctx.closePath();
+    const cone = ctx.createLinearGradient(-wid, 0, wid, 0);
+    cone.addColorStop(0, '#5f6a7c'); cone.addColorStop(0.5, '#eef3fb'); cone.addColorStop(1, '#5f6a7c');
+    ctx.fillStyle = cone; ctx.fill();
+    // diagonal auger stripes, clipped to the cone, animated by spin
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-wid, R * 0.1); ctx.lineTo(wid, R * 0.1); ctx.lineTo(0, R * 0.1 + len); ctx.closePath();
+    ctx.clip();
+    ctx.strokeStyle = hexA(rar.color, 0.85);
+    ctx.lineWidth = Math.max(1.4, R * 0.05);
+    const phase = animated ? (spin * 0.16) % 1 : 0;
+    for (let s = -1; s < 5; s++) {
+      const off = (s + phase) * (len / 4);
       ctx.beginPath();
-      for (let i = 0; i < teeth * 2; i++) {
-        const a = (i / (teeth * 2)) * Math.PI * 2;
-        const rad = i % 2 === 0 ? rr : rr * 0.7;
-        ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
-      }
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#8f9db2';
-      ctx.beginPath(); ctx.arc(0, 0, rr * 0.35, 0, Math.PI * 2); ctx.fill();
-      ctx.restore(); return;
-    }
-    // auger / drill / twin / quad: conical spinning bits
-    const bits = shape === 'twin' ? 2 : shape === 'quad' ? 3 : 1;
-    const spread = R * (bits > 1 ? 0.28 : 0);
-    for (let b = 0; b < bits; b++) {
-      const bx = bits === 1 ? 0 : -spread + (b / (bits - 1)) * spread * 2;
-      ctx.save();
-      ctx.translate(bx, 0);
-      // shaft
-      ctx.fillStyle = '#9aa7ba';
-      roundRect(ctx, -R * 0.1, 0, R * 0.2, R * 0.25, R * 0.05); ctx.fill();
-      // cone with rotating helical stripes
-      const len = R * 0.55, wid = R * 0.22;
-      const cone = ctx.createLinearGradient(-wid, 0, wid, 0);
-      cone.addColorStop(0, '#6b7688');
-      cone.addColorStop(0.5, '#dfe7f1');
-      cone.addColorStop(1, '#6b7688');
-      ctx.fillStyle = cone;
-      ctx.beginPath();
-      ctx.moveTo(-wid, R * 0.2); ctx.lineTo(wid, R * 0.2);
-      ctx.lineTo(0, R * 0.2 + len); ctx.closePath(); ctx.fill();
-      // helical highlight lines (animate via spin)
-      ctx.strokeStyle = hexA(rar.color, 0.8);
-      ctx.lineWidth = 2;
-      for (let s = 0; s < 3; s++) {
-        const ph = (spin * 0.5 + s / 3) % 1;
-        const yy = R * 0.2 + ph * len;
-        const t2 = ph;
-        const half = wid * (1 - t2);
-        ctx.beginPath(); ctx.moveTo(-half, yy); ctx.lineTo(half, yy); ctx.stroke();
-      }
-      ctx.restore();
+      ctx.moveTo(-wid, R * 0.1 + off);
+      ctx.lineTo(wid, R * 0.1 + off - len * 0.18);
+      ctx.stroke();
     }
     ctx.restore();
+    // bright ball tip
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = rar.glow; ctx.shadowBlur = 4;
+    ctx.beginPath(); ctx.arc(0, R * 0.1 + len, wid * 0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
+  ctx.restore();
 }
 
 // --- helpers ---------------------------------------------------------------

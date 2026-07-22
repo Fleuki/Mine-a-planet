@@ -2,9 +2,9 @@
 //  Static sprite drawing for UI thumbnails (drones, planets).
 // ============================================================================
 import { DRONE_BY_ID, RARITIES, PLANETS, ORES } from './config.js';
-import { roundRect, hexA } from './render.js';
+import { roundRect, hexA, drawDroneChassis, drawDrill } from './render.js';
 
-// Draw a drone icon into a canvas element, upright, with rarity glow + stars.
+// Draw a drone icon into a canvas element, upright, with a neon rarity ring.
 export function drawDroneIcon(canvas, droneId, star = 0) {
   const drone = DRONE_BY_ID[droneId];
   if (!drone) return;
@@ -16,19 +16,35 @@ export function drawDroneIcon(canvas, droneId, star = 0) {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, size, size);
 
-  // radial rarity backdrop
-  const bg = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  bg.addColorStop(0, hexA(rar.glow, 0.28));
-  bg.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size);
+  const cx = size / 2, cy = size * 0.46, R = size * 0.2;
 
-  const R = size * 0.24;
+  // Soft rarity haze.
   ctx.save();
-  ctx.translate(size / 2, size * 0.4);
-  drawDroneBody(ctx, drone, rar, R);
+  ctx.globalCompositeOperation = 'lighter';
+  const haze = ctx.createRadialGradient(cx, cy, size * 0.1, cx, cy, size * 0.46);
+  haze.addColorStop(0, hexA(rar.glow, 0.22));
+  haze.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = haze; ctx.beginPath(); ctx.arc(cx, cy, size * 0.46, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
-  if (star > 0) drawStarRow(ctx, size / 2, size * 0.9, star, size * 0.075);
+  // Crisp neon rarity ring behind the drone.
+  ctx.save();
+  ctx.strokeStyle = hexA(rar.color, 0.8); ctx.lineWidth = Math.max(1.4, size * 0.026);
+  ctx.shadowColor = rar.glow; ctx.shadowBlur = size * 0.09;
+  ctx.beginPath(); ctx.arc(cx, cy, size * 0.35, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+
+  // Drone chassis + static drill.
+  ctx.save();
+  ctx.translate(cx, cy);
+  drawDroneChassis(ctx, drone, rar, R, { animated: false });
+  ctx.save();
+  ctx.translate(0, R * 0.62 + R * 0.1);
+  drawDrill(ctx, drone.shape, R, 0.5, rar, false);
+  ctx.restore();
+  ctx.restore();
+
+  if (star > 0) drawStarRow(ctx, cx, size * 0.95, star, size * 0.075);
 }
 
 // A centered row of gold stars (used on icons + world drones).
@@ -57,85 +73,6 @@ function star5(ctx, cx, cy, r) {
   ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2;
   ctx.fill();
   ctx.lineWidth = 0.8; ctx.strokeStyle = '#b7791f'; ctx.shadowBlur = 0; ctx.stroke();
-  ctx.restore();
-}
-
-function drawDroneBody(ctx, drone, rar, R) {
-  const bodyW = R * 1.1, bodyH = R * 1.2;
-  // body
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
-  roundRect(ctx, -bodyW / 2, -bodyH / 2, bodyW, bodyH, R * 0.35);
-  const bodyGrad = ctx.createLinearGradient(0, -bodyH / 2, 0, bodyH / 2);
-  bodyGrad.addColorStop(0, '#eef3fb'); bodyGrad.addColorStop(0.5, '#c2cede'); bodyGrad.addColorStop(1, '#8b98ac');
-  ctx.fillStyle = bodyGrad; ctx.fill();
-  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-  // trim
-  ctx.fillStyle = rar.color;
-  roundRect(ctx, -bodyW / 2, -bodyH / 2, bodyW, R * 0.32, R * 0.16); ctx.fill();
-  // cockpit
-  const eye = ctx.createRadialGradient(0, -R * 0.12, 0, 0, -R * 0.12, R * 0.4);
-  eye.addColorStop(0, rar.glow); eye.addColorStop(0.6, rar.color); eye.addColorStop(1, hexA(rar.color, 0.2));
-  ctx.fillStyle = eye;
-  ctx.beginPath(); ctx.arc(0, -R * 0.12, R * 0.32, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.beginPath(); ctx.arc(-R * 0.1, -R * 0.22, R * 0.08, 0, Math.PI * 2); ctx.fill();
-  // fins
-  ctx.fillStyle = '#8f9db2';
-  roundRect(ctx, -bodyW / 2 - R * 0.18, -R * 0.05, R * 0.2, R * 0.5, R * 0.08); ctx.fill();
-  roundRect(ctx, bodyW / 2 - R * 0.02, -R * 0.05, R * 0.2, R * 0.5, R * 0.08); ctx.fill();
-
-  // drill
-  ctx.translate(0, bodyH / 2 - R * 0.05);
-  drawDrillStatic(ctx, drone.shape, R, rar);
-  ctx.restore();
-}
-
-function drawDrillStatic(ctx, shape, R, rar) {
-  ctx.save();
-  if (shape === 'laser') {
-    ctx.fillStyle = '#5a6577';
-    roundRect(ctx, -R * 0.16, 0, R * 0.32, R * 0.4, R * 0.08); ctx.fill();
-    ctx.fillStyle = rar.glow;
-    ctx.shadowColor = rar.glow; ctx.shadowBlur = 8;
-    ctx.beginPath(); ctx.arc(0, R * 0.42, R * 0.12, 0, Math.PI * 2); ctx.fill();
-    ctx.restore(); return;
-  }
-  if (shape === 'saw') {
-    ctx.translate(0, R * 0.4);
-    ctx.fillStyle = '#c8d2e0';
-    const teeth = 10, rr = R * 0.42;
-    ctx.beginPath();
-    for (let i = 0; i < teeth * 2; i++) {
-      const a = (i / (teeth * 2)) * Math.PI * 2;
-      const rad = i % 2 === 0 ? rr : rr * 0.7;
-      ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
-    }
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#8f9db2';
-    ctx.beginPath(); ctx.arc(0, 0, rr * 0.35, 0, Math.PI * 2); ctx.fill();
-    ctx.restore(); return;
-  }
-  const bits = shape === 'twin' ? 2 : shape === 'quad' ? 3 : 1;
-  const spread = R * (bits > 1 ? 0.28 : 0);
-  for (let b = 0; b < bits; b++) {
-    const bx = bits === 1 ? 0 : -spread + (b / (bits - 1)) * spread * 2;
-    ctx.save(); ctx.translate(bx, 0);
-    ctx.fillStyle = '#9aa7ba';
-    roundRect(ctx, -R * 0.1, 0, R * 0.2, R * 0.25, R * 0.05); ctx.fill();
-    const len = R * 0.55, wid = R * 0.22;
-    const cone = ctx.createLinearGradient(-wid, 0, wid, 0);
-    cone.addColorStop(0, '#6b7688'); cone.addColorStop(0.5, '#dfe7f1'); cone.addColorStop(1, '#6b7688');
-    ctx.fillStyle = cone;
-    ctx.beginPath();
-    ctx.moveTo(-wid, R * 0.2); ctx.lineTo(wid, R * 0.2); ctx.lineTo(0, R * 0.2 + len); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = hexA(rar.color, 0.8); ctx.lineWidth = 1.5;
-    for (let s = 1; s <= 2; s++) {
-      const yy = R * 0.2 + (s / 3) * len; const half = wid * (1 - s / 3);
-      ctx.beginPath(); ctx.moveTo(-half, yy); ctx.lineTo(half, yy); ctx.stroke();
-    }
-    ctx.restore();
-  }
   ctx.restore();
 }
 
