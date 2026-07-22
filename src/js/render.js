@@ -1,7 +1,7 @@
 // ============================================================================
 //  World renderer: planet (baked, rotating), dock ring, animated mining drones.
 // ============================================================================
-import { PLANETS, DRONE_BY_ID, RARITIES, ORES } from './config.js';
+import { PLANETS, DRONE_BY_ID, RARITIES, ORES, ORE_BY_ID } from './config.js';
 
 // Deterministic pseudo-random for stable planet features per tier.
 function mulberry32(a) {
@@ -265,6 +265,17 @@ export class WorldRenderer {
       this._drawBeam(ctx, bx, by, sx, sy, rar, drone.shape, t + slot.index);
     }
 
+    // Ore gem — shows which ore this drone is currently mining (to one side).
+    if (slot.oreId) {
+      const ore = ORE_BY_ID[slot.oreId];
+      if (ore) {
+        const perp = toCenter + Math.PI / 2;
+        const gx = pos.x + Math.cos(perp) * padR * 1.0;
+        const gy = pos.y + Math.sin(perp) * padR * 1.0 + hover;
+        drawOreGem(ctx, gx, gy, padR * 0.32, ore, t * 2 + slot.index);
+      }
+    }
+
     // Star pips (outward from the planet, in screen space).
     if (slot.star > 0) {
       const outAng = Math.atan2(pos.y - this.cy, pos.x - this.cx);
@@ -436,6 +447,50 @@ function hexA(hex, a) {
   const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   return `rgba(${r},${g},${b},${a})`;
+}
+
+// A small faceted gem in the ore's colour, with a bob + sparkle.
+function drawOreGem(ctx, cx, cy, r, ore, t) {
+  const bob = Math.sin(t) * r * 0.15;
+  cy += bob;
+  ctx.save();
+  // glow
+  ctx.globalCompositeOperation = 'lighter';
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 2.2);
+  glow.addColorStop(0, hexA(ore.shine, 0.5));
+  glow.addColorStop(1, hexA(ore.shine, 0));
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  // gem body: hexagonal cut
+  const top = -r, bot = r * 1.15, w = r * 0.85, sh = -r * 0.35;
+  ctx.beginPath();
+  ctx.moveTo(0, top);
+  ctx.lineTo(w, sh);
+  ctx.lineTo(w * 0.6, bot);
+  ctx.lineTo(-w * 0.6, bot);
+  ctx.lineTo(-w, sh);
+  ctx.closePath();
+  const g = ctx.createLinearGradient(0, top, 0, bot);
+  g.addColorStop(0, ore.shine);
+  g.addColorStop(0.5, ore.color);
+  g.addColorStop(1, ore.color);
+  ctx.fillStyle = g;
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
+  ctx.fill(); ctx.stroke();
+  // table facet highlight
+  ctx.beginPath();
+  ctx.moveTo(0, top); ctx.lineTo(w * 0.5, sh); ctx.lineTo(0, sh * 0.2); ctx.lineTo(-w * 0.5, sh); ctx.closePath();
+  ctx.fillStyle = hexA(ore.shine, 0.7); ctx.fill();
+  // twinkle
+  const tw = 0.5 + 0.5 * Math.sin(t * 2.3);
+  ctx.globalAlpha = tw;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-w * 0.25, sh * 0.6, r * 0.12, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 }
 
 // A small horizontal row of gold stars in screen space.

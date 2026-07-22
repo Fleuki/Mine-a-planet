@@ -90,9 +90,19 @@
       </button>
     </div>
 
-    <!-- Active boost timer -->
-    <div class="boost-timer" id="boostTimer">
-      <span>⚡ x2</span><span id="boostTime">5:00</span>
+    <!-- Status stack: cosmic event banner + active boost timer -->
+    <div class="status-stack" id="statusStack">
+      <div class="event-banner" id="eventBanner">
+        <span class="eb-icon" id="eventIcon">☄️</span>
+        <span class="eb-text">
+          <span class="eb-name" id="eventName">Событие</span>
+          <span class="eb-bonus" id="eventBonus">Бонус</span>
+        </span>
+        <span class="eb-time" id="eventTime">1:00</span>
+      </div>
+      <div class="boost-timer" id="boostTimer">
+        <span>⚡ x2</span><span id="boostTime">5:00</span>
+      </div>
     </div>
 
     <!-- Bottom: drone inventory hotbar -->

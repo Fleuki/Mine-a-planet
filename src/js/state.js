@@ -5,7 +5,7 @@ import {
   ORES, DRONES, DRONE_BY_ID, DRONES_BY_RARITY, RARITIES, RARITY_ORDER,
   PLANETS, UPGRADES, ROULETTE, planetUpgradeCost,
   BOOST, ACHIEVEMENTS, DAILY_REWARDS, FUSION, GEM_SHOP,
-  STAR, droneStarMult,
+  STAR, droneStarMult, EVENTS, EVENT_BY_ID, EVENT_CONFIG,
 } from './config.js';
 
 let _uid = 1;
@@ -28,6 +28,8 @@ export function createDefaultState() {
     achievements: {},                 // id -> true
     daily: { lastClaimDay: null, streak: 0 },
     boost: { until: 0 },              // ms timestamp
+    event: null,                      // { id, until } when an incident is active
+    nextEventAt: Date.now() + EVENT_CONFIG.firstDelay * 1000,
     settings: { sound: true, music: true },
     lastSeen: Date.now(),
     createdAt: Date.now(),
@@ -65,7 +67,7 @@ export class Game {
 
   // --- Derived getters ------------------------------------------------------
   get planet() { return PLANETS[this.state.planetTier]; }
-  get miningSpeedMult() { return UPGRADES.miningSpeed.value(this.state.upgrades.miningSpeed); }
+  get miningSpeedMult() { return UPGRADES.miningSpeed.value(this.state.upgrades.miningSpeed) * this.eventSpeedMult(); }
   get oreValueMult() { return UPGRADES.oreValue.value(this.state.upgrades.oreValue); }
   get storageCap() { return Math.floor(UPGRADES.storage.value(this.state.upgrades.storage)); }
   get luckLevel() { return this.state.upgrades.luck; }
@@ -105,7 +107,43 @@ export class Game {
   // --- Boost ----------------------------------------------------------------
   boostActive() { return Date.now() < (this.state.boost?.until || 0); }
   boostRemaining() { return Math.max(0, Math.floor(((this.state.boost?.until || 0) - Date.now()) / 1000)); }
-  incomeMult() { return this.boostActive() ? BOOST.mult : 1; }
+  incomeMult() { return (this.boostActive() ? BOOST.mult : 1) * this.eventIncomeMult(); }
+
+  // --- Cosmic events --------------------------------------------------------
+  eventActive() { return !!this.state.event && Date.now() < this.state.event.until; }
+  currentEvent() { return this.eventActive() ? EVENT_BY_ID[this.state.event.id] : null; }
+  eventRemaining() { return this.eventActive() ? Math.max(0, Math.floor((this.state.event.until - Date.now()) / 1000)) : 0; }
+  eventIncomeMult() { return this.currentEvent()?.bonus.income || 1; }
+  eventSpeedMult() { return this.currentEvent()?.bonus.speed || 1; }
+  eventLuckMult() { return this.currentEvent()?.bonus.luck || 1; }
+  luckFactor() { return (1 + this.luckLevel * ROULETTE.luckPerLevel) * this.eventLuckMult(); }
+
+  // Advance the event scheduler. Returns { type:'start'|'end', event, gems } or null.
+  updateEvents() {
+    const now = Date.now();
+    if (this.state.event) {
+      if (now >= this.state.event.until) {
+        const ended = EVENT_BY_ID[this.state.event.id];
+        this.state.event = null;
+        this.scheduleNextEvent();
+        const gems = EVENT_CONFIG.completionGems;
+        this.addGems(gems);
+        return { type: 'end', event: ended, gems };
+      }
+      return null;
+    }
+    if (now >= (this.state.nextEventAt || 0)) {
+      const ev = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+      this.state.event = { id: ev.id, until: now + ev.duration * 1000 };
+      return { type: 'start', event: ev };
+    }
+    return null;
+  }
+
+  scheduleNextEvent() {
+    const gap = EVENT_CONFIG.minGap + Math.random() * (EVENT_CONFIG.maxGap - EVENT_CONFIG.minGap);
+    this.state.nextEventAt = Date.now() + gap * 1000;
+  }
   activateBoost(seconds = BOOST.duration) {
     const now = Date.now();
     const base = Math.max(now, this.state.boost?.until || 0);
@@ -134,6 +172,7 @@ export class Game {
         const add = Math.min(amount, room);
         this.state.ore += add;
         this.state.oreValueAccum += this.oreSellValue(ore) * add;
+        slot.oreId = ore.id;                 // remember what this drone last dug
         mined = { slot, ore, amount: add, drone };
         emit('mined', mined);
       }
@@ -196,7 +235,7 @@ export class Game {
   }
 
   _rollOneDrone() {
-    const luck = 1 + this.luckLevel * ROULETTE.luckPerLevel;
+    const luck = this.luckFactor();
     // Build weighted rarity table; luck multiplies weights of rarer tiers.
     let total = 0;
     const table = RARITY_ORDER.map(rid => {

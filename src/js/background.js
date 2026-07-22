@@ -11,7 +11,13 @@ export class Background {
     this.w = 0; this.h = 0;
     this.t = 0;
     this._shootTimer = 3;
+    this.eventTheme = null;      // active event theme (persists during fade-out)
+    this.eventOn = false;        // is an event currently running
+    this.eventAlpha = 0;         // eased 0..1 tint strength
   }
+
+  setEvent(theme) { this.eventTheme = theme; this.eventOn = true; }
+  clearEvent() { this.eventOn = false; }
 
   resize(w, h) {
     this.w = w; this.h = h;
@@ -63,15 +69,22 @@ export class Background {
     this.t += dt;
     for (const s of this.stars) s.tw += s.twSpd * dt;
 
+    // Ease the event tint in/out; drop the theme once fully faded.
+    const target = this.eventOn ? 1 : 0;
+    this.eventAlpha += (target - this.eventAlpha) * Math.min(1, dt * 2.2);
+    if (!this.eventOn && this.eventAlpha < 0.01) this.eventTheme = null;
+
+    const meteorStorm = this.eventOn && this.eventTheme?.meteors;
     this._shootTimer -= dt;
     if (this._shootTimer <= 0) {
-      this._shootTimer = 4 + Math.random() * 7;
+      this._shootTimer = meteorStorm ? (0.18 + Math.random() * 0.5) : (4 + Math.random() * 7);
       const edge = Math.random();
       this.shooters.push({
         x: edge * this.w, y: -20,
         vx: (Math.random() - 0.5) * 240 - 120,
         vy: 220 + Math.random() * 160,
         life: 1.1, maxLife: 1.1,
+        meteor: meteorStorm,
       });
     }
     for (let i = this.shooters.length - 1; i >= 0; i--) {
@@ -117,20 +130,58 @@ export class Background {
     }
     ctx.globalAlpha = 1;
 
-    // Shooting stars.
+    // Shooting stars / meteors.
     for (const sh of this.shooters) {
       const a = Math.min(1, sh.life / sh.maxLife);
-      const len = 60;
+      const len = sh.meteor ? 90 : 60;
       const nx = sh.vx, ny = sh.vy;
       const mag = Math.hypot(nx, ny) || 1;
       const tx = sh.x - (nx / mag) * len, ty = sh.y - (ny / mag) * len;
       const grad = ctx.createLinearGradient(sh.x, sh.y, tx, ty);
-      grad.addColorStop(0, `rgba(255,255,255,${a})`);
-      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      if (sh.meteor) {
+        grad.addColorStop(0, `rgba(255,225,150,${a})`);
+        grad.addColorStop(0.4, `rgba(255,130,60,${a * 0.8})`);
+        grad.addColorStop(1, 'rgba(255,90,40,0)');
+        ctx.lineWidth = 3.2;
+      } else {
+        grad.addColorStop(0, `rgba(255,255,255,${a})`);
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.lineWidth = 2;
+      }
       ctx.strokeStyle = grad;
-      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(sh.x, sh.y); ctx.lineTo(tx, ty); ctx.stroke();
+      if (sh.meteor) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const hg = ctx.createRadialGradient(sh.x, sh.y, 0, sh.x, sh.y, 6);
+        hg.addColorStop(0, `rgba(255,235,180,${a})`);
+        hg.addColorStop(1, 'rgba(255,140,60,0)');
+        ctx.fillStyle = hg;
+        ctx.beginPath(); ctx.arc(sh.x, sh.y, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // Event mood tint over the sky (planet is drawn after, stays untinted).
+    if (this.eventTheme && this.eventAlpha > 0.01) {
+      const th = this.eventTheme;
+      ctx.save();
+      ctx.globalAlpha = this.eventAlpha * 0.5;
+      const g = ctx.createLinearGradient(0, 0, 0, this.h);
+      g.addColorStop(0, th.top);
+      g.addColorStop(1, th.bottom);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, this.w, this.h);
+      // accent glow from the top
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = this.eventAlpha * 0.25;
+      const ag = ctx.createRadialGradient(this.w / 2, 0, 0, this.w / 2, 0, this.h * 0.8);
+      ag.addColorStop(0, th.accent || '#ffffff');
+      ag.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = ag;
+      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.restore();
     }
   }
 }

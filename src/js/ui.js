@@ -96,6 +96,7 @@ export class UI {
     this.updateRailCosts();
     this.updateBadges();
     this.updateBoostTimer();
+    this.updateEventBanner();
   }
 
   updateMoney() {
@@ -126,6 +127,38 @@ export class UI {
     } else {
       el.classList.remove('show');
     }
+  }
+
+  updateEventBanner() {
+    const el = $('#eventBanner');
+    if (this.game.eventActive()) {
+      const ev = this.game.currentEvent();
+      const acc = ev.theme.accent || '#ff6b3d';
+      el.classList.add('show');
+      el.style.setProperty('--eb-accent', acc);
+      el.style.setProperty('--eb-glow', hexA(acc, 0.5));
+      $('#eventIcon').textContent = ev.icon;
+      $('#eventName').textContent = ev.name;
+      $('#eventBonus').textContent = ev.desc;
+      const s = this.game.eventRemaining();
+      $('#eventTime').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    } else {
+      el.classList.remove('show');
+    }
+  }
+
+  onEventStart(ev) {
+    audio.achievement();
+    this.toast(`${ev.icon} ${ev.name}! ${ev.desc}`);
+    this.updateEventBanner();
+    if ($('#rouletteModal').classList.contains('open')) this.renderOdds();
+  }
+
+  onEventEnd(ev, gems) {
+    this.toast(`${ev.name} завершено · +${gems} ◆`);
+    this.updateMoney();
+    this.updateEventBanner();
+    if ($('#rouletteModal').classList.contains('open')) this.renderOdds();
   }
 
   updateRailCosts() {
@@ -210,7 +243,7 @@ export class UI {
   }
 
   renderOdds() {
-    const luck = 1 + this.game.luckLevel * ROULETTE.luckPerLevel;
+    const luck = this.game.luckFactor();
     let total = 0;
     const ws = RARITY_ORDER.map(rid => {
       const base = RARITIES[rid].weight;

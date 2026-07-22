@@ -76,6 +76,7 @@ export const DRONES = [
   { id: 'devourer', name: 'Пожиратель',   rarity: 'mythic',    power: 2100,interval: 0.65,shape: 'laser' },
 ];
 
+export const ORE_BY_ID = Object.fromEntries(ORES.map(o => [o.id, o]));
 export const DRONE_BY_ID = Object.fromEntries(DRONES.map(d => [d.id, d]));
 export const DRONES_BY_RARITY = RARITY_ORDER.reduce((acc, r) => {
   acc[r] = DRONES.filter(d => d.rarity === r);
@@ -179,6 +180,39 @@ export const UPGRADE_BRANCHES = {
 export function planetUpgradeCost(tier) {
   return Math.floor(1000 * Math.pow(6.5, tier));
 }
+
+// --- Cosmic events ----------------------------------------------------------
+// Timed incidents that recolour the sky and grant a temporary bonus.
+// bonus keys: income (sell value ×), speed (mining ×), luck (roulette luck ×).
+export const EVENTS = [
+  {
+    id: 'meteor', name: 'Метеоритный дождь', icon: '☄️', desc: 'Ценность руды ×2',
+    bonus: { income: 2 }, duration: 75,
+    theme: { top: '#2a0e10', bottom: '#0a0304', nebula: [[170, 55, 40], [130, 35, 45]], meteors: true, accent: '#ff6b3d' },
+  },
+  {
+    id: 'flare', name: 'Солнечная вспышка', icon: '🌟', desc: 'Скорость бурения ×2',
+    bonus: { speed: 2 }, duration: 60,
+    theme: { top: '#2b2408', bottom: '#0c0a02', nebula: [[210, 150, 40], [230, 120, 30]], accent: '#ffcf4a' },
+  },
+  {
+    id: 'anomaly', name: 'Космическая аномалия', icon: '🌀', desc: 'Удача рулетки ×3',
+    bonus: { luck: 3 }, duration: 70,
+    theme: { top: '#1a0a30', bottom: '#060210', nebula: [[130, 45, 175], [90, 35, 165]], accent: '#c084fc' },
+  },
+  {
+    id: 'goldrush', name: 'Золотая лихорадка', icon: '💰', desc: 'Доход ×3',
+    bonus: { income: 3 }, duration: 50,
+    theme: { top: '#2a2308', bottom: '#0c0902', nebula: [[220, 175, 45], [230, 150, 25]], accent: '#ffd54a' },
+  },
+];
+export const EVENT_BY_ID = Object.fromEntries(EVENTS.map(e => [e.id, e]));
+export const EVENT_CONFIG = {
+  firstDelay: 90,     // seconds after load before the first event can fire
+  minGap: 150,        // min seconds between events
+  maxGap: 300,        // max seconds between events
+  completionGems: 3,  // gems granted when an event finishes
+};
 
 // --- Boosts -----------------------------------------------------------------
 export const BOOST = {

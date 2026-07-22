@@ -8,7 +8,7 @@ import { WorldRenderer } from './render.js';
 import { Particles } from './particles.js';
 import { UI } from './ui.js';
 import { audio } from './audio.js';
-import { DRONE_BY_ID, RARITIES, formatShort } from './config.js';
+import { DRONE_BY_ID, RARITIES, formatShort, EVENT_BY_ID } from './config.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -51,6 +51,18 @@ on('sold', ({ value }) => {
   particles.floatText(world.cx, world.cy - world.R * 1.15, '+' + '₡' + formatShort(value), '#ffd54a', { size: 22 });
   particles.ring(world.cx, world.cy, '#ffd54a', { maxR: world.R * 1.4, life: 0.6 });
 });
+
+// --- Cosmic events ----------------------------------------------------------
+function handleEvent(evt) {
+  if (evt.type === 'start') {
+    bg.setEvent(evt.event.theme);
+    audio.boost();
+    ui.onEventStart(evt.event);
+  } else if (evt.type === 'end') {
+    bg.clearEvent();
+    ui.onEventEnd(evt.event, evt.gems);
+  }
+}
 
 // --- Input: tap drones/slots on the planet ring -----------------------------
 function handleTap(x, y) {
@@ -132,11 +144,18 @@ function loop(now) {
 
   particles.draw(ctx);
 
-  // periodic UI heartbeat (boost timer, badges, achievements)
+  // periodic UI heartbeat (boost timer, events, badges, achievements)
   uiTimer += dt;
   if (uiTimer > 1) {
     uiTimer = 0;
-    if (ui) { ui.updateBoostTimer(); ui.updateBadges(); game.evaluateAchievements(); }
+    if (ui) {
+      const evt = game.updateEvents();
+      if (evt) handleEvent(evt);
+      ui.updateBoostTimer();
+      ui.updateEventBanner();
+      ui.updateBadges();
+      game.evaluateAchievements();
+    }
   }
 
   // periodic autosave
@@ -167,11 +186,19 @@ async function boot() {
   // Debug hook (harmless in production; handy for tuning).
   window.__game = game;
   window.__cheat = () => { game.state.money += 1e7; game.state.gems += 500; ui && ui.updateMoney(); };
+  window.__forceEvent = (id = 'meteor') => {
+    const ev = EVENT_BY_ID[id]; if (!ev) return;
+    game.state.event = { id, until: Date.now() + ev.duration * 1000 };
+    handleEvent({ type: 'start', event: ev });
+  };
 
   resize();
   world.setTier(game.state.planetTier);
   ui = new UI(game, particles, platform);
   ui.onPlanetChange = (tier) => { world.setTier(tier); };
+
+  // Restore an in-progress event's sky theme after a reload.
+  if (game.eventActive()) { bg.setEvent(game.currentEvent().theme); ui.updateEventBanner(); }
 
   // hook money/upgrade/planet events to refresh HUD
   on('money', () => ui.updateMoney());
