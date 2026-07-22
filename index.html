@@ -219,25 +219,28 @@ html, body {
 @keyframes resultPop { from { transform: scale(.4) rotate(-8deg); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* ===== Upgrades tree ===== */
-.branches { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+.branches { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
 .branch { background: rgba(0,0,0,.22); border: 1px solid var(--panel-border); border-radius: 18px; padding: 12px; }
 .branch-head { text-align: center; font-weight: 800; font-size: 15px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--panel-border); }
-.up-node { display: flex; gap: 10px; align-items: center; padding: 9px; border-radius: 12px; background: rgba(255,255,255,.04); margin-bottom: 8px; }
-.up-icon { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: rgba(255,255,255,.07); }
-.up-icon svg { width: 24px; height: 24px; }
+.up-node { display: flex; flex-direction: column; gap: 8px; padding: 11px; border-radius: 14px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.05); margin-bottom: 9px; }
+.up-top { display: flex; gap: 10px; align-items: center; }
+.up-icon { flex: 0 0 42px; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: rgba(255,255,255,.07); }
+.up-icon svg { width: 25px; height: 25px; }
 .up-main { flex: 1; min-width: 0; }
-.up-name { font-weight: 800; font-size: 13px; display: flex; justify-content: space-between; gap: 6px; }
-.up-lv { font-size: 11px; color: var(--text-dim); font-weight: 800; }
-.up-desc { font-size: 10.5px; color: var(--text-dim); line-height: 1.15; margin: 1px 0 5px; }
+.up-name { font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.up-name .up-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.up-lv { flex: 0 0 auto; font-size: 11px; color: var(--text-dim); font-weight: 800; background: rgba(255,255,255,.08); padding: 2px 9px; border-radius: 999px; }
+.up-lv.max { color: #3a2400; background: linear-gradient(180deg, var(--gold), var(--gold-2)); }
+.up-desc { font-size: 11px; color: var(--text-dim); line-height: 1.25; margin-top: 3px; }
 .up-buy {
-  border: none; cursor: pointer; font-family: var(--font); font-weight: 800; font-size: 12px;
-  padding: 6px 10px; border-radius: 9px; width: 100%;
+  border: none; cursor: pointer; font-family: var(--font); font-weight: 800; font-size: 14px;
+  padding: 10px 12px; border-radius: 11px; width: 100%;
   background: linear-gradient(180deg, var(--gold), var(--gold-2)); color: #3a2400;
   box-shadow: 0 3px 0 #c9781f; transition: transform .07s, box-shadow .07s;
 }
 .up-buy:active { transform: translateY(2px); box-shadow: 0 1px 0 #c9781f; }
 .up-buy:disabled { filter: grayscale(.7) brightness(.65); box-shadow: none; cursor: default; }
-.up-buy.maxed { background: rgba(255,255,255,.1); color: var(--text-dim); box-shadow: none; }
+.up-buy.maxed { background: rgba(255,255,255,.08); color: var(--text-dim); box-shadow: none; cursor: default; }
 
 /* ===== Planet modal ===== */
 .planet-preview { display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 14px; }
@@ -456,6 +459,9 @@ html, body {
 .col-cell.locked .cc-name { color: var(--text-dim); }
 
 /* ===== Hangar management ===== */
+.equip-best { margin-bottom: 12px; font-size: 15px; padding: 11px; background: linear-gradient(180deg, var(--green), var(--green-2)); color: #06210f; box-shadow: 0 4px 0 #14803a, 0 6px 14px rgba(0,0,0,.35); }
+.equip-best:active { transform: translateY(3px); box-shadow: 0 1px 0 #14803a; }
+.equip-best:disabled { filter: grayscale(.6) brightness(.7); box-shadow: none; cursor: default; }
 .hangar-tools { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .hg-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .hg-lbl { font-size: 11px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: .3px; }
@@ -718,6 +724,7 @@ html, body {
     <div class="modal hangar-modal">
       <button class="close" data-close></button>
       <h2>Ангар дронов <span class="ach-count" id="hangarCount"></span></h2>
+      <button class="big-btn equip-best" id="btnEquipBest">⚡ Экипировать лучших</button>
       <div class="hangar-tools">
         <div class="hg-row"><span class="hg-lbl">Сортировка</span><div class="hg-sort" id="hangarSort"></div></div>
         <div class="hg-row"><span class="hg-lbl">Фильтр</span><div class="hg-filter" id="hangarFilter"></div></div>
@@ -923,29 +930,29 @@ html, body {
   var LUCK_MAX_EXPONENT = 4;
   var ORES = [
     { id: "dust", name: "\u041F\u044B\u043B\u044C", tier: 0, value: 1, color: "#8a8f9c", shine: "#c3c8d4" },
-    { id: "copper", name: "\u041C\u0435\u0434\u044C", tier: 0, value: 4, color: "#d98a4b", shine: "#f4b184" },
-    { id: "iron", name: "\u0416\u0435\u043B\u0435\u0437\u043E", tier: 1, value: 11, color: "#a7b0bd", shine: "#dfe6ef" },
-    { id: "silver", name: "\u0421\u0435\u0440\u0435\u0431\u0440\u043E", tier: 1, value: 28, color: "#c8d4e0", shine: "#ffffff" },
-    { id: "gold", name: "\u0417\u043E\u043B\u043E\u0442\u043E", tier: 2, value: 72, color: "#f4c542", shine: "#fff3b0" },
-    { id: "amethyst", name: "\u0410\u043C\u0435\u0442\u0438\u0441\u0442", tier: 3, value: 190, color: "#a855f7", shine: "#e9d5ff" },
-    { id: "emerald", name: "\u0418\u0437\u0443\u043C\u0440\u0443\u0434", tier: 4, value: 480, color: "#22c55e", shine: "#bbf7d0" },
-    { id: "sapphire", name: "\u0421\u0430\u043F\u0444\u0438\u0440", tier: 5, value: 1250, color: "#3b82f6", shine: "#bfdbfe" },
-    { id: "ruby", name: "\u0420\u0443\u0431\u0438\u043D", tier: 6, value: 3200, color: "#ef4444", shine: "#fecaca" },
-    { id: "diamond", name: "\u0410\u043B\u043C\u0430\u0437", tier: 7, value: 8600, color: "#67e8f9", shine: "#ffffff" },
-    { id: "plasma", name: "\u041F\u043B\u0430\u0437\u043C\u0430", tier: 8, value: 24e3, color: "#e879f9", shine: "#fbcfe8" },
-    { id: "voidstone", name: "\u041F\u0443\u0441\u0442\u043E\u043A\u0430\u043C\u0435\u043D\u044C", tier: 9, value: 68e3, color: "#7c3aed", shine: "#c4b5fd" }
+    { id: "copper", name: "\u041C\u0435\u0434\u044C", tier: 0, value: 2, color: "#d98a4b", shine: "#f4b184" },
+    { id: "iron", name: "\u0416\u0435\u043B\u0435\u0437\u043E", tier: 1, value: 3, color: "#a7b0bd", shine: "#dfe6ef" },
+    { id: "silver", name: "\u0421\u0435\u0440\u0435\u0431\u0440\u043E", tier: 1, value: 5, color: "#c8d4e0", shine: "#ffffff" },
+    { id: "gold", name: "\u0417\u043E\u043B\u043E\u0442\u043E", tier: 2, value: 8, color: "#f4c542", shine: "#fff3b0" },
+    { id: "amethyst", name: "\u0410\u043C\u0435\u0442\u0438\u0441\u0442", tier: 3, value: 13, color: "#a855f7", shine: "#e9d5ff" },
+    { id: "emerald", name: "\u0418\u0437\u0443\u043C\u0440\u0443\u0434", tier: 4, value: 20, color: "#22c55e", shine: "#bbf7d0" },
+    { id: "sapphire", name: "\u0421\u0430\u043F\u0444\u0438\u0440", tier: 5, value: 31, color: "#3b82f6", shine: "#bfdbfe" },
+    { id: "ruby", name: "\u0420\u0443\u0431\u0438\u043D", tier: 6, value: 47, color: "#ef4444", shine: "#fecaca" },
+    { id: "diamond", name: "\u0410\u043B\u043C\u0430\u0437", tier: 7, value: 72, color: "#67e8f9", shine: "#ffffff" },
+    { id: "plasma", name: "\u041F\u043B\u0430\u0437\u043C\u0430", tier: 8, value: 110, color: "#e879f9", shine: "#fbcfe8" },
+    { id: "voidstone", name: "\u041F\u0443\u0441\u0442\u043E\u043A\u0430\u043C\u0435\u043D\u044C", tier: 9, value: 165, color: "#7c3aed", shine: "#c4b5fd" }
   ];
   var PLANETS = [
     { name: "\u041F\u0443\u0441\u0442\u043E\u0448\u044C", core: "#5b6472", land: "#7c8797", accent: "#9aa6b6", atmos: "#8fa5c0", valueMult: 1 },
-    { name: "\u0420\u0443\u0434\u043D\u0438\u043A", core: "#6b5644", land: "#8a6f52", accent: "#b98c5a", atmos: "#c9a06a", valueMult: 1.8, clouds: 0.18 },
-    { name: "\u0422\u0443\u043D\u0434\u0440\u0430", core: "#3f5b63", land: "#5b8894", accent: "#8fd0d8", atmos: "#a7e8f0", valueMult: 3.2, clouds: 0.5 },
-    { name: "\u0414\u0436\u0443\u043D\u0433\u043B\u0438", core: "#2f5233", land: "#3f7a45", accent: "#6fce68", atmos: "#9dffa0", valueMult: 5.6, clouds: 0.6 },
-    { name: "\u041B\u0430\u0437\u0443\u0440\u0438\u0442", core: "#243a6b", land: "#3556a8", accent: "#5f8fff", atmos: "#8fb4ff", valueMult: 9.8, clouds: 0.55, ring: "#8fb4ff" },
-    { name: "\u041C\u0430\u0433\u043C\u0430", core: "#5b1e1e", land: "#a83535", accent: "#ff6b3d", atmos: "#ff9d5c", valueMult: 17, clouds: 0.3, lights: "#ffb24a" },
-    { name: "\u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B", core: "#4a2f6b", land: "#7b4fb0", accent: "#c98fff", atmos: "#e0b0ff", valueMult: 30, lights: "#e6b3ff", ring: "#c98fff" },
-    { name: "\u041F\u0435\u043F\u0435\u043B", core: "#2b2b30", land: "#4a4a52", accent: "#8a8a96", atmos: "#c0c0cc", valueMult: 52, clouds: 0.5 },
-    { name: "\u041D\u0435\u043E\u043D", core: "#0f3b3b", land: "#0f8a7a", accent: "#2affd5", atmos: "#7fffe8", valueMult: 92, lights: "#54ffe0", ring: "#2affd5" },
-    { name: "\u041F\u0443\u0441\u0442\u043E\u0442\u0430", core: "#1a0f2e", land: "#3d1f6b", accent: "#a855f7", atmos: "#d8b4fe", valueMult: 160, lights: "#c9a0ff", ring: "#a855f7" }
+    { name: "\u0420\u0443\u0434\u043D\u0438\u043A", core: "#6b5644", land: "#8a6f52", accent: "#b98c5a", atmos: "#c9a06a", valueMult: 1.45, clouds: 0.18 },
+    { name: "\u0422\u0443\u043D\u0434\u0440\u0430", core: "#3f5b63", land: "#5b8894", accent: "#8fd0d8", atmos: "#a7e8f0", valueMult: 2.1, clouds: 0.5 },
+    { name: "\u0414\u0436\u0443\u043D\u0433\u043B\u0438", core: "#2f5233", land: "#3f7a45", accent: "#6fce68", atmos: "#9dffa0", valueMult: 3, clouds: 0.6 },
+    { name: "\u041B\u0430\u0437\u0443\u0440\u0438\u0442", core: "#243a6b", land: "#3556a8", accent: "#5f8fff", atmos: "#8fb4ff", valueMult: 4.3, clouds: 0.55, ring: "#8fb4ff" },
+    { name: "\u041C\u0430\u0433\u043C\u0430", core: "#5b1e1e", land: "#a83535", accent: "#ff6b3d", atmos: "#ff9d5c", valueMult: 6.2, clouds: 0.3, lights: "#ffb24a" },
+    { name: "\u041A\u0440\u0438\u0441\u0442\u0430\u043B\u043B", core: "#4a2f6b", land: "#7b4fb0", accent: "#c98fff", atmos: "#e0b0ff", valueMult: 9, lights: "#e6b3ff", ring: "#c98fff" },
+    { name: "\u041F\u0435\u043F\u0435\u043B", core: "#2b2b30", land: "#4a4a52", accent: "#8a8a96", atmos: "#c0c0cc", valueMult: 13, clouds: 0.5 },
+    { name: "\u041D\u0435\u043E\u043D", core: "#0f3b3b", land: "#0f8a7a", accent: "#2affd5", atmos: "#7fffe8", valueMult: 19, lights: "#54ffe0", ring: "#2affd5" },
+    { name: "\u041F\u0443\u0441\u0442\u043E\u0442\u0430", core: "#1a0f2e", land: "#3d1f6b", accent: "#a855f7", atmos: "#d8b4fe", valueMult: 28, lights: "#c9a0ff", ring: "#a855f7" }
   ];
   var DRONES = [
     // Common
@@ -1000,11 +1007,11 @@ html, body {
   var ROULETTE = {
     baseCost: 60,
     // cost of one spin
-    costGrowth: 1.1,
+    costGrowth: 1.12,
     // cost multiplied per spin owned-drone count milestone
     // luck shifts probability mass toward higher rarities. Each luck level adds
     // a small multiplier to the weight of every rarity above common.
-    luckPerLevel: 0.14
+    luckPerLevel: 0.12
   };
   var UPGRADES = {
     miningSpeed: {
@@ -1013,10 +1020,10 @@ html, body {
       icon: "speed",
       desc: "\u0412\u0441\u0435 \u0434\u0440\u043E\u043D\u044B \u0431\u0443\u0440\u044F\u0442 \u0431\u044B\u0441\u0442\u0440\u0435\u0435",
       max: 40,
-      cost: (lv) => Math.floor(30 * Math.pow(1.4, lv)),
-      value: (lv) => 1 + lv * 0.15,
+      cost: (lv) => Math.floor(30 * Math.pow(1.5, lv)),
+      value: (lv) => 1 + lv * 0.1,
       // multiplier
-      format: (lv) => `x${(1 + lv * 0.15).toFixed(2)}`,
+      format: (lv) => `x${(1 + lv * 0.1).toFixed(2)}`,
       branch: "mining"
     },
     oreValue: {
@@ -1025,9 +1032,9 @@ html, body {
       icon: "gem",
       desc: "\u0420\u0443\u0434\u0430 \u043F\u0440\u043E\u0434\u0430\u0451\u0442\u0441\u044F \u0434\u043E\u0440\u043E\u0436\u0435",
       max: 40,
-      cost: (lv) => Math.floor(45 * Math.pow(1.4, lv)),
-      value: (lv) => 1 + lv * 0.12,
-      format: (lv) => `x${(1 + lv * 0.12).toFixed(2)}`,
+      cost: (lv) => Math.floor(45 * Math.pow(1.5, lv)),
+      value: (lv) => 1 + lv * 0.08,
+      format: (lv) => `x${(1 + lv * 0.08).toFixed(2)}`,
       branch: "mining"
     },
     storage: {
@@ -1049,7 +1056,7 @@ html, body {
       desc: "\u0411\u043E\u043B\u044C\u0448\u0435 \u0441\u043B\u043E\u0442\u043E\u0432 \u0434\u043B\u044F \u0434\u0440\u043E\u043D\u043E\u0432",
       max: 11,
       // 5 -> 16 slots
-      cost: (lv) => Math.floor(500 * Math.pow(1.8, lv)),
+      cost: (lv) => Math.floor(500 * Math.pow(2, lv)),
       value: (lv) => 5 + lv,
       // total slots
       format: (lv) => `${5 + lv} \u0441\u043B\u043E\u0442\u043E\u0432`,
@@ -1122,7 +1129,7 @@ html, body {
     fortune: { name: "\u0423\u0434\u0430\u0447\u0430", color: "#a855f7" }
   };
   function planetUpgradeCost(tier) {
-    return Math.floor(3500 * Math.pow(7, tier));
+    return Math.floor(9000 * Math.pow(5, tier));
   }
   var EVENTS = [
     {
@@ -1422,7 +1429,7 @@ html, body {
       let total = 0;
       const weights = avail.map((o) => {
         const dist = this.state.planetTier - o.tier;
-        const w = Math.pow(0.45, dist) + 0.05;
+        const w = Math.pow(0.55, dist) + 0.05;
         total += w;
         return w;
       });
@@ -1651,6 +1658,39 @@ html, body {
       this.state.stats.dronesPlaced++;
       emit("slots");
       return true;
+    }
+    // Auto-equip the strongest owned drones (slots + hangar) into the dock,
+    // moving weaker ones back to the hangar. Returns number of slots changed.
+    autoEquipBest() {
+      const dps = (droneId, star) => {
+        const d = DRONE_BY_ID[droneId];
+        return d ? d.power * droneStarMult(star || 0) / d.interval : -1;
+      };
+      const all = [];
+      for (const s of this.state.slots) if (s.droneId) all.push({ droneId: s.droneId, uid: s.uid, star: s.star || 0 });
+      for (const it of this.state.inventory) all.push({ droneId: it.droneId, uid: it.uid, star: it.star || 0 });
+      if (all.length === 0) return 0;
+      all.sort((a, b) => dps(b.droneId, b.star) - dps(a.droneId, a.star));
+      const cap = this.state.slots.length;
+      const best = all.slice(0, cap);
+      const rest = all.slice(cap);
+      const bestUids = new Set(best.map((b) => b.uid));
+      const placedUids = new Set(this.state.slots.filter((s) => s.droneId).map((s) => s.uid));
+      let changed = bestUids.size !== placedUids.size;
+      if (!changed) for (const u of bestUids) if (!placedUids.has(u)) { changed = true; break; }
+      if (!changed) return 0;
+      this.state.slots.forEach((s, i) => {
+        const b = best[i];
+        if (b) {
+          const keepProg = s.droneId === b.droneId && s.uid === b.uid ? s.progress : 0;
+          s.droneId = b.droneId; s.uid = b.uid; s.star = b.star; s.progress = keepProg;
+        } else {
+          s.droneId = null; s.uid = null; s.star = 0; s.progress = 0;
+        }
+      });
+      this.state.inventory = rest.map((r) => ({ uid: r.uid, droneId: r.droneId, star: r.star }));
+      emit("slots");
+      return best.length;
     }
     // How many copies of a given drone+star sit in the hangar right now.
     inventoryCount(droneId, star = 0) {
@@ -3542,6 +3582,19 @@ html, body {
         audio.click();
         this.openHangar();
       };
+      $("#btnEquipBest").onclick = () => {
+        const n = this.game.autoEquipBest();
+        if (n > 0) {
+          audio.upgrade();
+          this.toast("Лучшие дроны экипированы!");
+          this.updateInventory();
+          this.renderHangar();
+          this.game.evaluateAchievements();
+        } else {
+          audio.error();
+          this.toast("Уже стоят лучшие дроны");
+        }
+      };
       $("#btnBoost").onclick = () => {
         audio.click();
         this.openBoost();
@@ -3900,14 +3953,16 @@ html, body {
       const node = document.createElement("div");
       node.className = "up-node";
       node.innerHTML = `
-      <div class="up-icon">${UP_ICONS[def.icon] || ""}</div>
-      <div class="up-main">
-        <div class="up-name"><span>${def.name}</span><span class="up-lv">${maxed ? "MAX" : "\u0423\u0440." + lv}</span></div>
-        <div class="up-desc">${def.desc} \xB7 <b style="color:#eaf0ff">${def.format(lv)}</b></div>
-        <button class="up-buy ${maxed ? "maxed" : ""}" ${maxed || g.state.money < cost ? "disabled" : ""}>
-          ${maxed ? "\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C" : money(cost)}
-        </button>
-      </div>`;
+      <div class="up-top">
+        <div class="up-icon">${UP_ICONS[def.icon] || ""}</div>
+        <div class="up-main">
+          <div class="up-name"><span class="up-nm">${def.name}</span><span class="up-lv ${maxed ? "max" : ""}">${maxed ? "MAX" : "\u0423\u0440." + lv}</span></div>
+          <div class="up-desc">${def.desc} \xB7 <b style="color:#eaf0ff">${def.format(lv)}</b></div>
+        </div>
+      </div>
+      <button class="up-buy ${maxed ? "maxed" : ""}" ${maxed || g.state.money < cost ? "disabled" : ""}>
+        ${maxed ? "\u041C\u0430\u043A\u0441\u0438\u043C\u0443\u043C" : money(cost)}
+      </button>`;
       const btn = node.querySelector(".up-buy");
       if (!maxed) {
         btn.onclick = () => {
