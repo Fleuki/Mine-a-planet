@@ -6,9 +6,11 @@
   "type": "module",
   "scripts": {
     "start": "cd src && python3 -m http.server 8080",
-    "test:visual": "node tools/visual-test.mjs"
+    "test:visual": "node tools/visual-test.mjs",
+    "build:single": "node tools/build-single.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.28.1",
     "playwright": "^1.61.1"
   }
 }
