@@ -194,12 +194,21 @@ export const GEM_SHOP = {
 };
 
 // --- Fusion (Fuse Machine) --------------------------------------------------
-// Fuse 3 drones of the same rarity into 1 random drone of the next rarity up.
+// Rank fusion: 3 drones of the same rarity -> 1 random drone of next rarity up.
 export const FUSION = {
   need: 3,
   // Mythic can't fuse up — recycle 3 mythics for gems instead.
   mythicGemReward: 20,
 };
+
+// Star fusion: merge N identical drones (same id + star) -> same drone at +1 star.
+// Each star multiplies the drone's mining power.
+export const STAR = {
+  need: 2,          // identical drones required per +1 star
+  max: 5,           // star cap
+  color: '#ffd54a',
+};
+export function droneStarMult(star) { return Math.pow(1.5, star || 0); }
 
 // --- Daily rewards (7-day streak, then loops) --------------------------------
 export const DAILY_REWARDS = [
@@ -226,6 +235,8 @@ export const ACHIEVEMENTS = [
   { id: 'docks10',    name: 'Расширение',       desc: 'Открой 10 доков',              icon: '🔧', reward: { gems: 5 },     check: g => g.slotCount >= 10 },
   { id: 'fuse',       name: 'Алхимик',          desc: 'Сплавь дронов',                icon: '⚗️', reward: { money: 800 },  check: g => (g.state.stats.totalFused || 0) >= 1 },
   { id: 'fuse10',     name: 'Мастер сплава',    desc: 'Сделай 10 слияний',            icon: '🧪', reward: { gems: 10 },    check: g => (g.state.stats.totalFused || 0) >= 10 },
+  { id: 'star3',      name: 'Звёздный',         desc: 'Прокачай дрона до 3★',         icon: '⭐', reward: { gems: 12 },    check: g => (g.state.stats.maxStar || 0) >= 3 },
+  { id: 'star5',      name: 'Созвездие',        desc: 'Прокачай дрона до 5★',         icon: '✨', reward: { gems: 30 },    check: g => (g.state.stats.maxStar || 0) >= 5 },
   { id: 'planet3',    name: 'Терраформер',      desc: 'Прокачай планету до яруса 3',  icon: '🌍', reward: { gems: 8 },     check: g => g.state.planetTier >= 3 },
   { id: 'planet6',    name: 'Колонизатор',      desc: 'Прокачай планету до яруса 6',  icon: '🪐', reward: { gems: 20 },    check: g => g.state.planetTier >= 6 },
   { id: 'planetMax',  name: 'Владыка пустоты',  desc: 'Достигни последней планеты',   icon: '🌌', reward: { gems: 60 },    check: g => g.state.planetTier >= PLANETS.length - 1 },

@@ -4,8 +4,8 @@
 import { DRONE_BY_ID, RARITIES, PLANETS, ORES } from './config.js';
 import { roundRect, hexA } from './render.js';
 
-// Draw a drone icon into a canvas element, upright, with rarity glow.
-export function drawDroneIcon(canvas, droneId) {
+// Draw a drone icon into a canvas element, upright, with rarity glow + stars.
+export function drawDroneIcon(canvas, droneId, star = 0) {
   const drone = DRONE_BY_ID[droneId];
   if (!drone) return;
   const rar = RARITIES[drone.rarity];
@@ -24,8 +24,39 @@ export function drawDroneIcon(canvas, droneId) {
 
   const R = size * 0.24;
   ctx.save();
-  ctx.translate(size / 2, size * 0.42);
+  ctx.translate(size / 2, size * 0.4);
   drawDroneBody(ctx, drone, rar, R);
+  ctx.restore();
+
+  if (star > 0) drawStarRow(ctx, size / 2, size * 0.9, star, size * 0.075);
+}
+
+// A centered row of gold stars (used on icons + world drones).
+export function drawStarRow(ctx, cx, cy, count, r) {
+  const gap = r * 2.3;
+  const totalW = (count - 1) * gap;
+  ctx.save();
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < count; i++) {
+    star5(ctx, cx - totalW / 2 + i * gap, cy, r);
+  }
+  ctx.restore();
+}
+
+function star5(ctx, cx, cy, r) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const ang = (Math.PI / 5) * i - Math.PI / 2;
+    const rad = i % 2 === 0 ? r : r * 0.45;
+    ctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+  }
+  ctx.closePath();
+  ctx.fillStyle = '#ffd54a';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2;
+  ctx.fill();
+  ctx.lineWidth = 0.8; ctx.strokeStyle = '#b7791f'; ctx.shadowBlur = 0; ctx.stroke();
   ctx.restore();
 }
 

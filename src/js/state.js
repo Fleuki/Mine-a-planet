@@ -5,6 +5,7 @@ import {
   ORES, DRONES, DRONE_BY_ID, DRONES_BY_RARITY, RARITIES, RARITY_ORDER,
   PLANETS, UPGRADES, ROULETTE, planetUpgradeCost,
   BOOST, ACHIEVEMENTS, DAILY_REWARDS, FUSION, GEM_SHOP,
+  STAR, droneStarMult,
 } from './config.js';
 
 let _uid = 1;
@@ -23,7 +24,7 @@ export function createDefaultState() {
     upgrades: Object.fromEntries(Object.keys(UPGRADES).map(k => [k, 0])),
     autosellUnlocked: false,
     spins: 0,
-    stats: { totalEarned: 0, totalSpins: 0, bestRarity: 'common', dronesPlaced: 0, totalFused: 0 },
+    stats: { totalEarned: 0, totalSpins: 0, bestRarity: 'common', dronesPlaced: 0, totalFused: 0, maxStar: 0 },
     achievements: {},                 // id -> true
     daily: { lastClaimDay: null, streak: 0 },
     boost: { until: 0 },              // ms timestamp
@@ -34,7 +35,7 @@ export function createDefaultState() {
 }
 
 function makeSlots(n) {
-  return Array.from({ length: n }, (_, i) => ({ index: i, droneId: null, uid: null, progress: 0 }));
+  return Array.from({ length: n }, (_, i) => ({ index: i, droneId: null, uid: null, star: 0, progress: 0 }));
 }
 
 // --- Event bus --------------------------------------------------------------
@@ -57,9 +58,9 @@ export class Game {
     const want = UPGRADES.docks.value(this.state.upgrades.docks);
     const s = this.state.slots;
     if (s.length < want) {
-      for (let i = s.length; i < want; i++) s.push({ index: i, droneId: null, uid: null, progress: 0 });
+      for (let i = s.length; i < want; i++) s.push({ index: i, droneId: null, uid: null, star: 0, progress: 0 });
     }
-    s.forEach((slot, i) => slot.index = i);
+    s.forEach((slot, i) => { slot.index = i; if (slot.star == null) slot.star = 0; });
   }
 
   // --- Derived getters ------------------------------------------------------
@@ -128,7 +129,7 @@ export class Game {
         slot.progress -= 1;
         if (this.state.ore >= cap) { slot.progress = 1; break; } // cargo full
         const ore = this.rollOre();
-        const amount = drone.power;
+        const amount = drone.power * droneStarMult(slot.star);
         const room = cap - this.state.ore;
         const add = Math.min(amount, room);
         this.state.ore += add;
@@ -213,8 +214,8 @@ export class Game {
     return drone;
   }
 
-  addDroneToInventory(droneId) {
-    this.state.inventory.push({ uid: uid(), droneId });
+  addDroneToInventory(droneId, star = 0) {
+    this.state.inventory.push({ uid: uid(), droneId, star });
   }
 
   // Guaranteed Epic-or-better drone, paid with gems.
@@ -246,6 +247,7 @@ export class Game {
     const inv = this.state.inventory[invIdx];
     slot.droneId = inv.droneId;
     slot.uid = inv.uid;
+    slot.star = inv.star || 0;
     slot.progress = 0;
     this.state.inventory.splice(invIdx, 1);
     this.state.stats.dronesPlaced++;
@@ -254,14 +256,15 @@ export class Game {
   }
 
   // Auto-place a drone into the first free slot; returns slot index or -1.
-  autoPlace(droneId, droneUid) {
+  autoPlace(droneId, droneUid, star = 0) {
     const slot = this.state.slots.find(s => !s.droneId);
     if (!slot) {
-      this.state.inventory.push({ uid: droneUid ?? uid(), droneId });
+      this.state.inventory.push({ uid: droneUid ?? uid(), droneId, star });
       return -1;
     }
     slot.droneId = droneId;
     slot.uid = droneUid ?? uid();
+    slot.star = star;
     slot.progress = 0;
     this.state.stats.dronesPlaced++;
     emit('slots');
@@ -271,9 +274,10 @@ export class Game {
   removeDrone(slotIndex) {
     const slot = this.state.slots[slotIndex];
     if (!slot || !slot.droneId) return false;
-    this.state.inventory.push({ uid: slot.uid ?? uid(), droneId: slot.droneId });
+    this.state.inventory.push({ uid: slot.uid ?? uid(), droneId: slot.droneId, star: slot.star || 0 });
     slot.droneId = null;
     slot.uid = null;
+    slot.star = 0;
     slot.progress = 0;
     emit('slots');
     return true;
@@ -284,16 +288,16 @@ export class Game {
     const slot = this.state.slots[slotIndex];
     if (!slot || !slot.droneId) return 0;
     const drone = DRONE_BY_ID[slot.droneId];
-    const value = Math.floor(this.droneScrapValue(drone));
+    const value = Math.floor(this.droneScrapValue(drone, slot.star));
     this.state.money += value;
     emit('money', this.state.money);
-    slot.droneId = null; slot.uid = null; slot.progress = 0;
+    slot.droneId = null; slot.uid = null; slot.star = 0; slot.progress = 0;
     emit('slots');
     return value;
   }
 
-  droneScrapValue(drone) {
-    return (drone.power / drone.interval) * 15 * (RARITIES[drone.rarity].order + 1);
+  droneScrapValue(drone, star = 0) {
+    return (drone.power / drone.interval) * 15 * (RARITIES[drone.rarity].order + 1) * droneStarMult(star);
   }
 
   // --- Upgrades -------------------------------------------------------------
@@ -343,11 +347,13 @@ export class Game {
   addMoney(n) { this.state.money += n; emit('money', this.state.money); }
 
   // --- Fusion (Fuse Machine) ------------------------------------------------
-  // How many drones of each rarity are available to fuse (inventory only).
+  // Rank fusion only considers 0-star drones so starred drones are never
+  // accidentally consumed.
   fusionCounts() {
     const counts = {};
     for (const r of RARITY_ORDER) counts[r] = 0;
     for (const it of this.state.inventory) {
+      if ((it.star || 0) !== 0) continue;
       const d = DRONE_BY_ID[it.droneId];
       if (d) counts[d.rarity]++;
     }
@@ -358,14 +364,15 @@ export class Game {
     return this.fusionCounts()[rarity] >= FUSION.need;
   }
 
-  // Fuse `need` drones of a rarity. Returns { result, gems } or null.
+  // Fuse `need` 0-star drones of a rarity. Returns { result, gems } or null.
   fuse(rarity) {
     if (!this.canFuse(rarity)) return null;
-    // consume the first `need` matching drones from inventory
+    // consume the first `need` matching 0-star drones from inventory
     let removed = 0;
     for (let i = this.state.inventory.length - 1; i >= 0 && removed < FUSION.need; i--) {
-      const d = DRONE_BY_ID[this.state.inventory[i].droneId];
-      if (d && d.rarity === rarity) { this.state.inventory.splice(i, 1); removed++; }
+      const it = this.state.inventory[i];
+      const d = DRONE_BY_ID[it.droneId];
+      if (d && d.rarity === rarity && (it.star || 0) === 0) { this.state.inventory.splice(i, 1); removed++; }
     }
     this.state.stats.totalFused = (this.state.stats.totalFused || 0) + 1;
 
@@ -384,6 +391,43 @@ export class Game {
     }
     emit('fuse', { result });
     return { result };
+  }
+
+  // --- Star fusion ----------------------------------------------------------
+  // Groups of identical drones (same id + star) in inventory with count >= STAR.need.
+  starGroups() {
+    const map = {};
+    for (const it of this.state.inventory) {
+      const star = it.star || 0;
+      if (star >= STAR.max) continue;              // maxed can't merge further
+      const key = it.droneId + ':' + star;
+      (map[key] ||= { droneId: it.droneId, star, count: 0 }).count++;
+    }
+    return Object.values(map)
+      .filter(g => g.count >= STAR.need)
+      .sort((a, b) => b.star - a.star || b.count - a.count);
+  }
+
+  // Merge STAR.need identical drones -> one of the same drone at star+1.
+  fuseStars(droneId, star) {
+    star = star || 0;
+    let have = 0;
+    for (const it of this.state.inventory)
+      if (it.droneId === droneId && (it.star || 0) === star) have++;
+    if (have < STAR.need || star >= STAR.max) return null;
+
+    let removed = 0;
+    for (let i = this.state.inventory.length - 1; i >= 0 && removed < STAR.need; i--) {
+      const it = this.state.inventory[i];
+      if (it.droneId === droneId && (it.star || 0) === star) { this.state.inventory.splice(i, 1); removed++; }
+    }
+    const newStar = star + 1;
+    this.state.stats.totalFused = (this.state.stats.totalFused || 0) + 1;
+    if (newStar > (this.state.stats.maxStar || 0)) this.state.stats.maxStar = newStar;
+    // Put the upgraded drone straight onto a free dock (or into the hangar).
+    this.autoPlace(droneId, undefined, newStar);
+    emit('fuse', { starUp: true, droneId, star: newStar });
+    return { droneId, star: newStar };
   }
 
   // --- Achievements ---------------------------------------------------------
@@ -473,7 +517,7 @@ export class Game {
     for (const slot of this.state.slots) {
       if (!slot.droneId) continue;
       const d = DRONE_BY_ID[slot.droneId];
-      orePerSec += (d.power / d.interval) * this.miningSpeedMult;
+      orePerSec += (d.power * droneStarMult(slot.star) / d.interval) * this.miningSpeedMult;
     }
     if (orePerSec <= 0) return null;
     // Approx average ore value.

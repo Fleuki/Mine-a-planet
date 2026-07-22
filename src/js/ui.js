@@ -5,6 +5,7 @@ import {
   UPGRADES, UPGRADE_BRANCHES, RARITIES, RARITY_ORDER, DRONE_BY_ID,
   DRONES_BY_RARITY, PLANETS, ROULETTE, formatShort,
   ACHIEVEMENTS, DAILY_REWARDS, FUSION, BOOST, GEM_SHOP,
+  STAR, droneStarMult,
 } from './config.js';
 import { drawDroneIcon, drawPlanetIcon } from './sprites.js';
 import { audio } from './audio.js';
@@ -178,7 +179,8 @@ export class UI {
       name.className = 'ic-name'; name.textContent = drone.name;
       card.appendChild(name);
       strip.appendChild(card);
-      requestAnimationFrame(() => drawDroneIcon(cv, drone.id));
+      const st = item.star || 0;
+      requestAnimationFrame(() => drawDroneIcon(cv, drone.id, st));
       card.onclick = () => this.openPlaceFromInventory(item);
     }
   }
@@ -437,6 +439,7 @@ export class UI {
   openPlaceFromInventory(item) {
     const drone = DRONE_BY_ID[item.droneId];
     const rar = RARITIES[drone.rarity];
+    const star = item.star || 0;
     $('#placeTitle').textContent = drone.name;
     const body = $('#placeBody');
     body.innerHTML = '';
@@ -445,15 +448,16 @@ export class UI {
     preview.className = 'place-preview'; preview.style.setProperty('--rar', rar.color);
     const cv = document.createElement('canvas'); cv.style.width = '76px'; cv.style.height = '76px';
     const stats = document.createElement('div'); stats.className = 'place-stats';
-    const dps = (drone.power / drone.interval * this.game.miningSpeedMult).toFixed(1);
+    const mult = droneStarMult(star);
+    const dps = (drone.power * mult / drone.interval * this.game.miningSpeedMult).toFixed(1);
     stats.innerHTML = `
-      <div class="pr-name">${drone.name}</div>
+      <div class="pr-name">${drone.name} ${star > 0 ? `<span style="color:#ffd54a">${starStr(star)}</span>` : ''}</div>
       <div class="pr-rar" style="color:${rar.color}">${rar.name}</div>
       <div>Добыча: <b>${dps}</b> руды/с</div>
-      <div>За удар: <b>${drone.power}</b></div>`;
+      <div>За удар: <b>${Math.round(drone.power * mult)}</b></div>`;
     preview.append(cv, stats);
     body.appendChild(preview);
-    requestAnimationFrame(() => drawDroneIcon(cv, drone.id));
+    requestAnimationFrame(() => drawDroneIcon(cv, drone.id, star));
 
     const hasFree = this.game.state.slots.some(s => !s.droneId);
     const actions = document.createElement('div');
@@ -475,7 +479,7 @@ export class UI {
     };
     const scrapBtn = document.createElement('button');
     scrapBtn.className = 'btn-scrap';
-    const scrapVal = Math.floor(this.game.droneScrapValue(drone));
+    const scrapVal = Math.floor(this.game.droneScrapValue(drone, star));
     scrapBtn.innerHTML = `Разобрать<br>+${money(scrapVal)}`;
     scrapBtn.onclick = () => {
       const inv = this.game.state.inventory;
@@ -508,18 +512,20 @@ export class UI {
     const body = $('#placeBody');
     body.innerHTML = '';
 
+    const star = slot.star || 0;
     const preview = document.createElement('div');
     preview.className = 'place-preview'; preview.style.setProperty('--rar', rar.color);
     const cv = document.createElement('canvas'); cv.style.width = '76px'; cv.style.height = '76px';
     const stats = document.createElement('div'); stats.className = 'place-stats';
-    const dps = (drone.power / drone.interval * this.game.miningSpeedMult).toFixed(1);
+    const mult = droneStarMult(star);
+    const dps = (drone.power * mult / drone.interval * this.game.miningSpeedMult).toFixed(1);
     stats.innerHTML = `
-      <div class="pr-name">${drone.name}</div>
+      <div class="pr-name">${drone.name} ${star > 0 ? `<span style="color:#ffd54a">${starStr(star)}</span>` : ''}</div>
       <div class="pr-rar" style="color:${rar.color}">${rar.name}</div>
       <div>Добыча: <b>${dps}</b> руды/с</div>`;
     preview.append(cv, stats);
     body.appendChild(preview);
-    requestAnimationFrame(() => drawDroneIcon(cv, drone.id));
+    requestAnimationFrame(() => drawDroneIcon(cv, drone.id, star));
 
     const actions = document.createElement('div');
     actions.className = 'place-actions';
@@ -532,7 +538,7 @@ export class UI {
     };
     const scrapBtn = document.createElement('button');
     scrapBtn.className = 'btn-scrap';
-    const scrapVal = Math.floor(this.game.droneScrapValue(drone));
+    const scrapVal = Math.floor(this.game.droneScrapValue(drone, star));
     scrapBtn.innerHTML = `Продать<br>+${money(scrapVal)}`;
     scrapBtn.onclick = () => {
       this.game.sellDrone(slotIndex);
@@ -552,29 +558,69 @@ export class UI {
   renderFuse() {
     const list = $('#fuseList');
     list.innerHTML = '';
-    const counts = this.game.fusionCounts();
     let any = false;
+
+    // --- Star section: identical drone merges --------------------------------
+    const groups = this.game.starGroups();
+    if (groups.length) {
+      any = true;
+      list.appendChild(sectionHead('⭐ Звёзды — слияние одинаковых'));
+      for (const g of groups) {
+        const drone = DRONE_BY_ID[g.droneId];
+        const rar = RARITIES[drone.rarity];
+        const row = document.createElement('div');
+        row.className = 'fuse-row';
+        row.style.setProperty('--rar', rar.color);
+        const cv = document.createElement('canvas');
+        cv.className = 'fr-icon'; cv.style.width = '46px'; cv.style.height = '46px';
+        const info = document.createElement('div');
+        info.className = 'fr-info';
+        info.innerHTML = `
+          <div class="fr-rar" style="color:${rar.color}">${drone.name} ${starStr(g.star)}</div>
+          <div class="fr-count">В ангаре: ${g.count} · нужно ${STAR.need}</div>`;
+        const arrow = document.createElement('div');
+        arrow.className = 'fr-arrow'; arrow.innerHTML = `${starStr(g.star)}→${starStr(g.star + 1)}`;
+        const btn = document.createElement('button');
+        btn.className = 'fuse-btn-do star'; btn.textContent = 'Слить ★';
+        btn.disabled = g.count < STAR.need;
+        btn.onclick = () => this.doFuseStars(g.droneId, g.star);
+        row.append(cv, info, arrow, btn);
+        list.appendChild(row);
+        requestAnimationFrame(() => drawDroneIcon(cv, drone.id, g.star));
+      }
+    }
+
+    // --- Rank section: same-rarity fusion ------------------------------------
+    const counts = this.game.fusionCounts();
+    const rankRows = [];
     for (const rid of RARITY_ORDER) {
       const c = counts[rid];
       if (c <= 0) continue;
-      any = true;
-      const rar = RARITIES[rid];
-      const isMythic = rar.order >= RARITY_ORDER.length - 1;
-      const nextName = isMythic ? `${FUSION.mythicGemReward} ◆` : RARITIES[RARITY_ORDER[rar.order + 1]].name;
-      const can = c >= FUSION.need;
-      const row = document.createElement('div');
-      row.className = 'fuse-row';
-      row.style.setProperty('--rar', rar.color);
-      row.innerHTML = `
-        <div class="fr-info">
-          <div class="fr-rar">${rar.name}</div>
-          <div class="fr-count">В ангаре: ${c} · нужно ${FUSION.need}</div>
-        </div>
-        <div class="fr-arrow">${FUSION.need}× → ${nextName}</div>
-        <button class="fuse-btn-do" ${can ? '' : 'disabled'}>Сплавить</button>`;
-      row.querySelector('.fuse-btn-do').onclick = () => this.doFuse(rid);
-      list.appendChild(row);
+      rankRows.push({ rid, c });
     }
+    if (rankRows.length) {
+      any = true;
+      list.appendChild(sectionHead('🔺 Ранг — слияние по редкости (0★)'));
+      for (const { rid, c } of rankRows) {
+        const rar = RARITIES[rid];
+        const isMythic = rar.order >= RARITY_ORDER.length - 1;
+        const nextName = isMythic ? `${FUSION.mythicGemReward} ◆` : RARITIES[RARITY_ORDER[rar.order + 1]].name;
+        const can = c >= FUSION.need;
+        const row = document.createElement('div');
+        row.className = 'fuse-row';
+        row.style.setProperty('--rar', rar.color);
+        row.innerHTML = `
+          <div class="fr-info">
+            <div class="fr-rar">${rar.name}</div>
+            <div class="fr-count">В ангаре: ${c} · нужно ${FUSION.need}</div>
+          </div>
+          <div class="fr-arrow">${FUSION.need}× → ${nextName}</div>
+          <button class="fuse-btn-do" ${can ? '' : 'disabled'}>Сплавить</button>`;
+        row.querySelector('.fuse-btn-do').onclick = () => this.doFuse(rid);
+        list.appendChild(row);
+      }
+    }
+
     if (!any) {
       const e = document.createElement('div');
       e.className = 'fuse-empty';
@@ -594,6 +640,18 @@ export class UI {
     } else if (res.gems) {
       this.toast(`Переработка: +${res.gems} ◆`);
     }
+    this.updateMoney();
+    this.updateInventory();
+    this.renderFuse();
+    this.game.evaluateAchievements();
+  }
+
+  doFuseStars(droneId, star) {
+    const res = this.game.fuseStars(droneId, star);
+    if (!res) { audio.error(); return; }
+    audio.fuse();
+    const d = DRONE_BY_ID[droneId];
+    this.toast(`${d.name} → ${starStr(res.star)}!`);
     this.updateMoney();
     this.updateInventory();
     this.renderFuse();
@@ -825,4 +883,13 @@ function toRoman(num) {
   let r = '';
   for (const [v, s] of map) while (num >= v) { r += s; num -= v; }
   return r || 'I';
+}
+
+function starStr(n) { return `${n}★`; }
+
+function sectionHead(text) {
+  const d = document.createElement('div');
+  d.className = 'fuse-section';
+  d.textContent = text;
+  return d;
 }

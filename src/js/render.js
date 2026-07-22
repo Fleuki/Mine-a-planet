@@ -264,6 +264,14 @@ export class WorldRenderer {
       const sy = this.cy - Math.sin(toCenter) * this.R * 0.98;
       this._drawBeam(ctx, bx, by, sx, sy, rar, drone.shape, t + slot.index);
     }
+
+    // Star pips (outward from the planet, in screen space).
+    if (slot.star > 0) {
+      const outAng = Math.atan2(pos.y - this.cy, pos.x - this.cx);
+      const sx2 = pos.x + Math.cos(outAng) * padR * 1.45;
+      const sy2 = pos.y + Math.sin(outAng) * padR * 1.45 + hover;
+      drawStarsAt(ctx, sx2, sy2, slot.star, padR * 0.2);
+    }
     return pos;
   }
 
@@ -428,6 +436,29 @@ function hexA(hex, a) {
   const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   return `rgba(${r},${g},${b},${a})`;
+}
+
+// A small horizontal row of gold stars in screen space.
+function drawStarsAt(ctx, cx, cy, count, r) {
+  const gap = r * 2.3;
+  const totalW = (count - 1) * gap;
+  for (let i = 0; i < count; i++) {
+    const x = cx - totalW / 2 + i * gap;
+    ctx.save();
+    ctx.translate(x, cy);
+    ctx.beginPath();
+    for (let k = 0; k < 10; k++) {
+      const ang = (Math.PI / 5) * k - Math.PI / 2;
+      const rad = k % 2 === 0 ? r : r * 0.45;
+      ctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#ffd54a';
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 3;
+    ctx.fill();
+    ctx.shadowBlur = 0; ctx.lineWidth = 1; ctx.strokeStyle = '#b7791f'; ctx.stroke();
+    ctx.restore();
+  }
 }
 
 export { hexA, roundRect };
