@@ -20,6 +20,8 @@ export class WorldRenderer {
     this.rot = 0;
     this.tier = -1;
     this.surface = null;      // baked wide surface strip
+    this.clouds = null;       // baked drifting cloud strip
+    this.lights = null;       // baked emissive city/ember strip
     this.surfW = 0; this.surfH = 0;
     this.pulse = 0;
     this.impacts = [];        // transient surface impact glints
@@ -114,6 +116,41 @@ export class WorldRenderer {
     }
 
     this.surface = c; this.surfW = W; this.surfH = H;
+
+    // Drifting cloud layer (soft white puffs on transparent).
+    this.clouds = null;
+    if (p.clouds) {
+      const cc = document.createElement('canvas'); cc.width = W; cc.height = H;
+      const cg = cc.getContext('2d');
+      const cn = 14 + Math.floor(rnd() * 10);
+      for (let i = 0; i < cn; i++) {
+        const bx = rnd() * W, by = rnd() * H;
+        const br = (0.09 + rnd() * 0.18) * H;
+        const grad = cg.createRadialGradient(bx, by, 0, bx, by, br);
+        grad.addColorStop(0, `rgba(255,255,255,${(0.5 * p.clouds).toFixed(3)})`);
+        grad.addColorStop(0.5, `rgba(255,255,255,${(0.2 * p.clouds).toFixed(3)})`);
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        cg.fillStyle = grad;
+        cg.beginPath(); cg.arc(bx, by, br, 0, Math.PI * 2); cg.fill();
+      }
+      this.clouds = cc;
+    }
+
+    // Emissive city / ember lights (bright dots on transparent).
+    this.lights = null;
+    if (p.lights) {
+      const lc = document.createElement('canvas'); lc.width = W; lc.height = H;
+      const lg = lc.getContext('2d');
+      const ln = 100 + Math.floor(rnd() * 80);
+      for (let i = 0; i < ln; i++) {
+        const bx = rnd() * W, by = rnd() * H;
+        const s = (0.004 + rnd() * 0.011) * H;
+        lg.fillStyle = p.lights;
+        lg.shadowColor = p.lights; lg.shadowBlur = s * 3;
+        lg.beginPath(); lg.arc(bx, by, s, 0, Math.PI * 2); lg.fill();
+      }
+      this.lights = lc;
+    }
   }
 
   update(dt) {
@@ -145,6 +182,9 @@ export class WorldRenderer {
     const p = PLANETS[this.tier] || PLANETS[0];
     const { cx, cy, R } = this;
 
+    // Planetary ring — far (back) half behind the planet.
+    if (p.ring) this._drawRing(ctx, cx, cy, R, p.ring, false);
+
     // Atmosphere glow (additive).
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -164,23 +204,18 @@ export class WorldRenderer {
 
     const artPath = PLANET_ART[this.tier];
     const art = artPath && getArt(artPath);
-    if (art && art.ready && art.img.width) {
+    const custom = art && art.ready && art.img.width;
+    if (custom) {
       ctx.drawImage(art.img, cx - R, cy - R, R * 2, R * 2);   // custom static art
     } else if (this.surface) {
-      const destH = R * 2;
-      const scale = destH / this.surfH;
-      const destW = this.surfW * scale;
-      const period = destW / 2;                  // strip is 2.2x wide; wrap over ~diameter
-      let offset = (this.rot * period) % period;
-      const top = cy - R;
-      // draw two copies for seamless horizontal wrap
-      for (let k = -1; k <= 1; k++) {
-        ctx.drawImage(this.surface, cx - R - offset + k * period, top, destW, destH);
-      }
+      this._drawStrip(ctx, this.surface, R, this.rot, 1);
     } else {
       ctx.fillStyle = p.land;
       ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
     }
+
+    // Drifting clouds (parallax: slightly faster than the surface).
+    if (!custom && this.clouds) this._drawStrip(ctx, this.clouds, R, this.rot, 1.45);
 
     // Limb darkening + light from upper-left.
     const shade = ctx.createRadialGradient(
@@ -192,6 +227,23 @@ export class WorldRenderer {
     shade.addColorStop(1, 'rgba(0,0,0,0.62)');
     ctx.fillStyle = shade;
     ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+
+    // Emissive city / ember lights — additive, brighter on the night side.
+    if (!custom && this.lights) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      // Night-side mask: dimmer toward the lit upper-left.
+      const night = ctx.createRadialGradient(cx - R * 0.4, cy - R * 0.4, R * 0.2, cx + R * 0.3, cy + R * 0.3, R * 1.3);
+      // Draw lights, then knock them back on the day side.
+      this._drawStrip(ctx, this.lights, R, this.rot, 1);
+      ctx.globalCompositeOperation = 'destination-out';
+      night.addColorStop(0, 'rgba(0,0,0,0.85)');
+      night.addColorStop(0.6, 'rgba(0,0,0,0.15)');
+      night.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = night;
+      ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+      ctx.restore();
+    }
 
     // Surface impact glints from active mining.
     for (const im of this.impacts) {
@@ -213,6 +265,42 @@ export class WorldRenderer {
     ctx.strokeStyle = hexA(p.atmos, 0.5);
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(cx, cy, R - 1, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+
+    // Planetary ring — near (front) half over the planet.
+    if (p.ring) this._drawRing(ctx, cx, cy, R, p.ring, true);
+  }
+
+  // Draws a baked wide strip clipped to the current sphere clip, scrolling
+  // horizontally by `rot * speed` for a fake rotation / parallax.
+  _drawStrip(ctx, strip, R, rot, speed) {
+    const { cx, cy } = this;
+    const destH = R * 2;
+    const scale = destH / strip.height;
+    const destW = strip.width * scale;
+    const period = destW / 2;
+    const offset = (rot * speed * period) % period;
+    const top = cy - R;
+    for (let k = -1; k <= 1; k++) {
+      ctx.drawImage(strip, cx - R - offset + k * period, top, destW, destH);
+    }
+  }
+
+  // Draws one half of a tilted planetary ring. frontOnly=true clips to the
+  // lower band (in front of the planet); false clips to the upper band (behind).
+  _drawRing(ctx, cx, cy, R, color, frontOnly) {
+    ctx.save();
+    ctx.beginPath();
+    if (frontOnly) ctx.rect(cx - R * 2.2, cy, R * 4.4, R * 1.4);
+    else ctx.rect(cx - R * 2.2, cy - R * 1.4, R * 4.4, R * 1.4);
+    ctx.clip();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = hexA(color, 0.4);
+    ctx.lineWidth = R * 0.2;
+    ctx.beginPath(); ctx.ellipse(cx, cy, R * 1.72, R * 0.5, -0.3, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = hexA(color, 0.85);
+    ctx.lineWidth = R * 0.05;
+    ctx.beginPath(); ctx.ellipse(cx, cy, R * 1.58, R * 0.46, -0.3, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
 
@@ -248,7 +336,7 @@ export class WorldRenderer {
     const rar = RARITIES[drone.rarity];
     const hover = Math.sin(t * 3 + slot.index) * 3;     // bob
     ctx.translate(0, hover);
-    ctx.rotate(toCenter + Math.PI / 2);                 // face the planet
+    ctx.rotate(toCenter - Math.PI / 2);                 // drill points at the planet
 
     // Glow aura by rarity.
     const aura = ctx.createRadialGradient(0, 0, 0, 0, 0, padR * 1.8);

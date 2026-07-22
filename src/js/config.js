@@ -42,17 +42,21 @@ export const ORES = [
 
 // --- Planet tiers -----------------------------------------------------------
 // Each tier restyles the planet and raises the global ore-value multiplier.
+// Optional visual enrichment per tier:
+//   clouds  - drifting cloud-layer intensity (0..1)
+//   lights  - emissive "city / ember" dot colour on the surface
+//   ring    - planetary-ring colour
 export const PLANETS = [
   { name: 'Пустошь',    core: '#5b6472', land: '#7c8797', accent: '#9aa6b6', atmos: '#8fa5c0', valueMult: 1 },
-  { name: 'Рудник',     core: '#6b5644', land: '#8a6f52', accent: '#b98c5a', atmos: '#c9a06a', valueMult: 1.8 },
-  { name: 'Тундра',     core: '#3f5b63', land: '#5b8894', accent: '#8fd0d8', atmos: '#a7e8f0', valueMult: 3.2 },
-  { name: 'Джунгли',    core: '#2f5233', land: '#3f7a45', accent: '#6fce68', atmos: '#9dffa0', valueMult: 5.6 },
-  { name: 'Лазурит',    core: '#243a6b', land: '#3556a8', accent: '#5f8fff', atmos: '#8fb4ff', valueMult: 9.8 },
-  { name: 'Магма',      core: '#5b1e1e', land: '#a83535', accent: '#ff6b3d', atmos: '#ff9d5c', valueMult: 17 },
-  { name: 'Кристалл',   core: '#4a2f6b', land: '#7b4fb0', accent: '#c98fff', atmos: '#e0b0ff', valueMult: 30 },
-  { name: 'Пепел',      core: '#2b2b30', land: '#4a4a52', accent: '#8a8a96', atmos: '#c0c0cc', valueMult: 52 },
-  { name: 'Неон',       core: '#0f3b3b', land: '#0f8a7a', accent: '#2affd5', atmos: '#7fffe8', valueMult: 92 },
-  { name: 'Пустота',    core: '#1a0f2e', land: '#3d1f6b', accent: '#a855f7', atmos: '#d8b4fe', valueMult: 160 },
+  { name: 'Рудник',     core: '#6b5644', land: '#8a6f52', accent: '#b98c5a', atmos: '#c9a06a', valueMult: 1.8,  clouds: 0.18 },
+  { name: 'Тундра',     core: '#3f5b63', land: '#5b8894', accent: '#8fd0d8', atmos: '#a7e8f0', valueMult: 3.2,  clouds: 0.5 },
+  { name: 'Джунгли',    core: '#2f5233', land: '#3f7a45', accent: '#6fce68', atmos: '#9dffa0', valueMult: 5.6,  clouds: 0.6 },
+  { name: 'Лазурит',    core: '#243a6b', land: '#3556a8', accent: '#5f8fff', atmos: '#8fb4ff', valueMult: 9.8,  clouds: 0.55, ring: '#8fb4ff' },
+  { name: 'Магма',      core: '#5b1e1e', land: '#a83535', accent: '#ff6b3d', atmos: '#ff9d5c', valueMult: 17,   clouds: 0.3,  lights: '#ffb24a' },
+  { name: 'Кристалл',   core: '#4a2f6b', land: '#7b4fb0', accent: '#c98fff', atmos: '#e0b0ff', valueMult: 30,   lights: '#e6b3ff', ring: '#c98fff' },
+  { name: 'Пепел',      core: '#2b2b30', land: '#4a4a52', accent: '#8a8a96', atmos: '#c0c0cc', valueMult: 52,   clouds: 0.5 },
+  { name: 'Неон',       core: '#0f3b3b', land: '#0f8a7a', accent: '#2affd5', atmos: '#7fffe8', valueMult: 92,   lights: '#54ffe0', ring: '#2affd5' },
+  { name: 'Пустота',    core: '#1a0f2e', land: '#3d1f6b', accent: '#a855f7', atmos: '#d8b4fe', valueMult: 160,  lights: '#c9a0ff', ring: '#a855f7' },
 ];
 
 // --- Drones -----------------------------------------------------------------

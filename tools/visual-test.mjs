@@ -94,6 +94,16 @@ await page.evaluate(() => { const g = window.__game; g.deployDrones('celestia', 
 await page.waitForTimeout(800);
 await page.screenshot({ path: 'tools/shot_13_customart.png' });
 
+// Enriched planet — Джунгли (clouds).
+await page.evaluate(() => { window.__game.state.planetTier = 3; });
+await page.waitForTimeout(900);
+await page.screenshot({ path: 'tools/shot_14_planet_jungle.png' });
+
+// Enriched planet — Неон (city lights + ring).
+await page.evaluate(() => { window.__game.state.planetTier = 8; });
+await page.waitForTimeout(900);
+await page.screenshot({ path: 'tools/shot_15_planet_neon.png' });
+
 // Multi-reel roulette (rolls upgrade -> multiple reels)
 await page.evaluate(() => { const g = window.__game; g.state.upgrades.rolls = 3; window.ui.updateRailCosts(); });
 await page.click('#btnRoulette');
