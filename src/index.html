@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mine a Planet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- ===== Loader ===== -->
+  <div id="loader">
+    <div class="loader-inner">
+      <div class="loader-planet"></div>
+      <div class="loader-title">MINE&nbsp;A&nbsp;PLANET</div>
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- ===== Game canvas ===== -->
+  <canvas id="game"></canvas>
+
+  <!-- ===== HUD overlay ===== -->
+  <div id="hud">
+    <!-- Top-left: currencies -->
+    <div class="topbar">
+      <div class="stat money" id="moneyStat">
+        <span class="coin">₡</span>
+        <span class="val" id="moneyVal">0</span>
+      </div>
+      <div class="stat gems" id="gemsStat">
+        <span class="gem">◆</span>
+        <span class="val" id="gemsVal">0</span>
+      </div>
+    </div>
+
+    <!-- Top-center: planet nameplate -->
+    <div class="planet-name" id="planetName">
+      <span class="pn-title">Пустошь</span>
+      <span class="pn-sub">Планета I</span>
+    </div>
+
+    <!-- Top-right: cargo -->
+    <div class="cargo" id="cargo">
+      <div class="cargo-head">
+        <span>Трюм</span>
+        <span id="cargoText">0 / 0</span>
+      </div>
+      <div class="cargo-bar"><div class="cargo-fill" id="cargoFill"></div></div>
+      <button class="sell-btn" id="sellBtn">Продать <span id="sellValue">₡0</span></button>
+    </div>
+
+    <!-- Left rail: main action buttons -->
+    <div class="rail">
+      <button class="rail-btn spin-btn" id="btnRoulette">
+        <span class="rb-icon">🎰</span>
+        <span class="rb-label">Рулетка</span>
+        <span class="rb-cost" id="rouletteCost">₡50</span>
+      </button>
+      <button class="rail-btn" id="btnUpgrades">
+        <span class="rb-icon">⚙️</span>
+        <span class="rb-label">Апгрейды</span>
+      </button>
+      <button class="rail-btn planet-btn" id="btnPlanet">
+        <span class="rb-icon">🪐</span>
+        <span class="rb-label">Планета</span>
+        <span class="rb-cost" id="planetCost">₡1K</span>
+      </button>
+    </div>
+
+    <!-- Bottom: drone inventory hotbar -->
+    <div class="hotbar" id="hotbar">
+      <div class="hotbar-title">Ангар дронов</div>
+      <div class="hotbar-slots" id="inventoryStrip"></div>
+    </div>
+  </div>
+
+  <!-- ===== Roulette modal ===== -->
+  <div class="overlay" id="rouletteModal">
+    <div class="modal roulette-modal">
+      <button class="close" data-close></button>
+      <h2>Рулетка дронов</h2>
+      <div class="reel-viewport">
+        <div class="reel-pointer"></div>
+        <div class="reel" id="reel"></div>
+      </div>
+      <div class="roulette-foot">
+        <div class="odds" id="odds"></div>
+        <button class="big-btn" id="doSpin">
+          Крутить <span id="doSpinCost">₡50</span>
+        </button>
+      </div>
+      <div class="spin-results" id="spinResults"></div>
+    </div>
+  </div>
+
+  <!-- ===== Upgrades modal ===== -->
+  <div class="overlay" id="upgradesModal">
+    <div class="modal upgrades-modal">
+      <button class="close" data-close></button>
+      <h2>Дерево прокачки</h2>
+      <div class="branches" id="branches"></div>
+    </div>
+  </div>
+
+  <!-- ===== Planet modal ===== -->
+  <div class="overlay" id="planetModal">
+    <div class="modal planet-modal">
+      <button class="close" data-close></button>
+      <h2>Улучшение планеты</h2>
+      <div class="planet-preview" id="planetPreview"></div>
+      <div class="planet-info" id="planetInfo"></div>
+      <button class="big-btn planet-up" id="doPlanet">Улучшить <span id="doPlanetCost">₡1K</span></button>
+    </div>
+  </div>
+
+  <!-- ===== Drone placement sheet (mobile-friendly) ===== -->
+  <div class="overlay" id="placeModal">
+    <div class="modal place-modal">
+      <button class="close" data-close></button>
+      <h2 id="placeTitle">Дрон</h2>
+      <div class="place-body" id="placeBody"></div>
+    </div>
+  </div>
+
+  <!-- ===== Offline earnings toast ===== -->
+  <div class="overlay" id="offlineModal">
+    <div class="modal offline-modal">
+      <h2>С возвращением!</h2>
+      <p id="offlineText"></p>
+      <button class="big-btn" data-close>Забрать</button>
+    </div>
+  </div>
+
+  <!-- ===== Toasts ===== -->
+  <div id="toasts"></div>
+
+  <!-- Yandex Games SDK (ignored gracefully when absent) -->
+  <script src="https://yandex.ru/games/sdk/v2" onerror="this.dataset.failed=1"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
