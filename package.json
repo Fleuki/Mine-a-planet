@@ -1,0 +1,16 @@
+{
+  "name": "mine-a-planet",
+  "version": "1.0.0",
+  "description": "2D idle/gacha mining game for Yandex Games",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "cd src && python3 -m http.server 8080",
+    "test:visual": "node tools/visual-test.mjs",
+    "build:single": "node tools/build-single.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1",
+    "playwright": "^1.61.1"
+  }
+}

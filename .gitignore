@@ -1,0 +1,9 @@
+node_modules/
+scratch_*
+tools/shot_*
+tools/mine-a-planet.html
+tools/verify-single.mjs
+package-lock.json
+*.log
+dist/
+.DS_Store
