@@ -1,0 +1,7 @@
+node_modules/
+scratch_*
+tools/shot_*
+package-lock.json
+*.log
+dist/
+.DS_Store
