@@ -69,6 +69,22 @@ var Platform = class {
     } catch (e) {
     }
   }
+  /**
+   * Wipes the save from wherever it lives. Like the other Platform methods it
+   * must never throw — the standalone build depends on these fallbacks.
+   */
+  async clear() {
+    if (this.usesCloud && this.player) {
+      try {
+        await this.player.setData({ save: "" }, true);
+      } catch (e) {
+      }
+    }
+    try {
+      localStorage.removeItem(LS_KEY);
+    } catch (e) {
+    }
+  }
   async load() {
     if (this.usesCloud && this.player) {
       try {

@@ -138,9 +138,20 @@ function loop(now) {
   }
   requestAnimationFrame(loop);
 }
+// Set while a reset is in flight. The 12s autosave, the visibilitychange
+// handler and pagehide all call save(), and pagehide fires during the reload
+// that follows a wipe — without this the old state lands straight back in
+// storage and the reset silently does nothing.
+var resetting = false;
 async function save() {
+  if (resetting) return;
   game.touch();
   await platform.save(game.state);
+}
+async function resetProgress() {
+  resetting = true;
+  await platform.clear();
+  location.reload();
 }
 window.addEventListener("visibilitychange", () => {
   if (document.hidden) save();

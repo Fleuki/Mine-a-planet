@@ -107,6 +107,13 @@
       <button class="icon-btn" id="btnSound" title="Звук">
         <span id="soundIcon">🔊</span>
       </button>
+      <!-- TEMPORARY: progress reset for playtesting. To remove, delete this
+           button, UI.doReset() in src/js/ui.js, its #btnReset binding, the
+           .icon-btn.armed rule in styles.css, Platform.clear() in sdk.js and
+           the `resetting` guard in main.js. -->
+      <button class="icon-btn" id="btnReset" title="Сбросить прогресс">
+        <span>🗑️</span>
+      </button>
     </div>
 
     <!-- Status stack: cosmic event banner + active boost timer -->
