@@ -39,6 +39,8 @@ src/js/
   ui.js                 All DOM wiring: HUD, hotbar, modals, inventory, toasts.
   main.js               Entry point: canvas sizing, input, the rAF loop, boot.
 tools/smoke.mjs         Headless boot check (Playwright).
+tools/dechecker.mjs     Cuts a baked transparency checkerboard out of generated
+                        art and emits a downscaled PNG with a real alpha channel.
 .github/workflows/      deploy.yml -> GitHub Pages, ci.yml -> smoke test on PRs.
 ```
 
@@ -47,8 +49,10 @@ tools/smoke.mjs         Headless boot check (Playwright).
 a listed file that 404s falls back to the procedural art rather than breaking.
 Drone and ore sprites need a real alpha channel — they composite over the
 planet. `PLANET_ART` takes a **seamless ~2.2:1 surface map, not a planet face**:
-the renderer scrolls it so the planet keeps rotating. See `assets/README.md` and
-`docs/asset-prompts.md`.
+the renderer scrolls it so the planet keeps rotating, and since it needs no
+alpha a JPEG is the better format there. Generated art usually arrives with the
+transparency checkerboard baked into the pixels — `tools/dechecker.mjs` cuts it
+back out. See `assets/README.md` and `docs/asset-prompts.md`.
 
 ## The one structural rule: script order
 

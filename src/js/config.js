@@ -89,7 +89,7 @@ var DRONE_ART = {
 // Surface maps, NOT static planet faces: seamless equirectangular strips at
 // roughly 2.2:1, scrolled by WorldRenderer so the planet keeps rotating.
 var PLANET_ART = {
-  0: "assets/planets/wasteland.png"
+  0: "assets/planets/wasteland.jpg"
 };
 // Ore icon overrides. The glow behind the gem stays procedural either way.
 var ORE_ART = {
