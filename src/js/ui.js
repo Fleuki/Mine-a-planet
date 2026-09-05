@@ -85,6 +85,7 @@ var UI = class {
       this.openBoost();
     };
     $("#btnSound").onclick = () => this.toggleSound();
+    $("#btnReset").onclick = () => this.doReset();
     $("#claimDaily").onclick = () => this.doClaimDaily();
     $("#offlineDouble").onclick = () => this.doOfflineDouble();
     document.querySelectorAll("[data-close]").forEach((b) => {
@@ -1234,6 +1235,30 @@ var UI = class {
     }
   }
   // ---- Toast ----
+  /**
+   * TEMPORARY playtest helper: wipe the save and restart.
+   *
+   * Two-step on purpose — one stray tap on a rail button should never be able
+   * to destroy a player's run. The first tap arms the button for 4 seconds and
+   * says so; only a second tap inside that window actually wipes.
+   */
+  doReset() {
+    audio.click();
+    if (this._resetArmed) {
+      clearTimeout(this._resetArmed);
+      this._resetArmed = null;
+      this.toast("Прогресс сброшен");
+      resetProgress();
+      return;
+    }
+    const btn = $("#btnReset");
+    btn.classList.add("armed");
+    this.toast("Нажми ещё раз, чтобы стереть весь прогресс");
+    this._resetArmed = setTimeout(() => {
+      this._resetArmed = null;
+      btn.classList.remove("armed");
+    }, 4000);
+  }
   toast(text) {
     const t = document.createElement("div");
     t.className = "toast";

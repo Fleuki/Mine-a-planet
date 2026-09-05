@@ -538,3 +538,10 @@ html, body {
   .rail-btn { padding: 8px 5px; }
 }
 
+
+/* TEMPORARY: armed state for the playtest progress-reset button. */
+.icon-btn.armed {
+  border-color: var(--danger);
+  background: rgba(239, 68, 68, 0.22);
+  animation: pulseGlow 1s ease-in-out infinite;
+}
