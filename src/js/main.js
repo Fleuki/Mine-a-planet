@@ -148,7 +148,7 @@ window.addEventListener("visibilitychange", () => {
 window.addEventListener("pagehide", save);
 async function boot() {
   await platform.init();
-  preloadArt([...Object.values(DRONE_ART), ...Object.values(PLANET_ART)]);
+  preloadArt([...Object.values(DRONE_ART), ...Object.values(PLANET_ART), ...Object.values(ORE_ART)]);
   let saved = null;
   try {
     saved = await platform.load();

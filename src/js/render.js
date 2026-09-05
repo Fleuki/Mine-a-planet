@@ -205,14 +205,16 @@ var WorldRenderer = class {
     const art = artPath && getArt(artPath);
     const custom = art && art.ready && art.img.width;
     if (custom) {
-      ctx2.drawImage(art.img, cx - R, cy - R, R * 2, R * 2);
+      // Custom planet art is a surface map, not a static face: scroll it like
+      // the baked strip so the planet keeps turning and keeps its cloud layer.
+      this._drawStrip(ctx2, art.img, R, this.rot, 1, 1);
     } else if (this.surface) {
       this._drawStrip(ctx2, this.surface, R, this.rot, 1);
     } else {
       ctx2.fillStyle = p.land;
       ctx2.fillRect(cx - R, cy - R, R * 2, R * 2);
     }
-    if (!custom && this.clouds) this._drawStrip(ctx2, this.clouds, R, this.rot, 1.45);
+    if (this.clouds) this._drawStrip(ctx2, this.clouds, R, this.rot, 1.45);
     const shade = ctx2.createRadialGradient(
       cx - R * 0.35,
       cy - R * 0.35,
@@ -266,12 +268,17 @@ var WorldRenderer = class {
   }
   // Draws a baked wide strip clipped to the current sphere clip, scrolling
   // horizontally by `rot * speed` for a fake rotation / parallax.
-  _drawStrip(ctx2, strip, R, rot, speed) {
+  // `wrapDiv` is how often the strip repeats across its own width. The baked
+  // procedural surfaces are noise, so they tile at half width (2) without the
+  // repeat reading. A hand-made or generated equirectangular map is a single
+  // continuous image and must tile at full width (1), or only its left half
+  // would ever be visible.
+  _drawStrip(ctx2, strip, R, rot, speed, wrapDiv = 2) {
     const { cx, cy } = this;
     const destH = R * 2;
     const scale = destH / strip.height;
     const destW = strip.width * scale;
-    const period = destW / 2;
+    const period = destW / wrapDiv;
     const offset = rot * speed * period % period;
     const top = cy - R;
     for (let k = -1; k <= 1; k++) {
@@ -617,6 +624,15 @@ function drawOreGem(ctx2, cx, cy, r, ore, t) {
   ctx2.arc(cx, cy, r * 2.2, 0, Math.PI * 2);
   ctx2.fill();
   ctx2.restore();
+  // Optional PNG override. The glow above stays — it is what makes the gem
+  // read against the planet — and only the faceted body is replaced.
+  const oreArt = ORE_ART[ore.id] && getArt(ORE_ART[ore.id]);
+  if (oreArt && oreArt.ready && oreArt.img.width) {
+    const h = r * 2.4;
+    const w2 = h * (oreArt.img.width / oreArt.img.height);
+    ctx2.drawImage(oreArt.img, cx - w2 / 2, cy - h * 0.46, w2, h);
+    return;
+  }
   ctx2.save();
   ctx2.translate(cx, cy);
   const top = -r, bot = r * 1.15, w = r * 0.85, sh = -r * 0.35;

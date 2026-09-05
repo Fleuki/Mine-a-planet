@@ -42,9 +42,13 @@ tools/smoke.mjs         Headless boot check (Playwright).
 .github/workflows/      deploy.yml -> GitHub Pages, ci.yml -> smoke test on PRs.
 ```
 
-`assets/` is optional. Drop `assets/drones/*.png` or `assets/planets/*.png` in
-and point `DRONE_ART` / `PLANET_ART` in `config.js` at them to override the
-procedural art; anything not listed keeps drawing itself.
+`assets/` is optional. Drop PNGs in and point `DRONE_ART`, `PLANET_ART` or
+`ORE_ART` in `config.js` at them; anything not listed keeps drawing itself, and
+a listed file that 404s falls back to the procedural art rather than breaking.
+Drone and ore sprites need a real alpha channel — they composite over the
+planet. `PLANET_ART` takes a **seamless ~2.2:1 surface map, not a planet face**:
+the renderer scrolls it so the planet keeps rotating. See `assets/README.md` and
+`docs/asset-prompts.md`.
 
 ## The one structural rule: script order
 

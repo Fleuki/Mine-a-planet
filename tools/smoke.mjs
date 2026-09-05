@@ -16,7 +16,21 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 420, height: 840 } });
 
 const errors = [];
-page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+const missingArt = [];
+
+// A 404 under assets/ is by design, not a failure: DRONE_ART / PLANET_ART /
+// ORE_ART may name art that has not landed yet, and getArt() marks it failed so
+// the renderer falls back to the procedural sprite. Surface those separately so
+// a genuinely broken page still fails the run.
+page.on('response', (r) => {
+  if (r.status() === 404 && r.url().includes('/assets/')) missingArt.push(r.url().split('/').slice(-2).join('/'));
+});
+page.on('console', (m) => {
+  if (m.type() !== 'error') return;
+  const t = m.text();
+  if (/Failed to load resource/.test(t) && missingArt.length) return;
+  errors.push(`console: ${t}`);
+});
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 
 await page.goto(url, { waitUntil: 'networkidle' });
@@ -40,6 +54,11 @@ state.rouletteOpen = await page.evaluate(
 await browser.close();
 
 console.log(JSON.stringify(state, null, 2));
+
+if (missingArt.length) {
+  console.log(`\nNote: ${missingArt.length} optional art file(s) not present, ` +
+    `procedural fallback in use: ${missingArt.join(', ')}`);
+}
 
 const failures = Object.entries(state)
   .filter(([k, v]) => k !== 'money' && !v)
